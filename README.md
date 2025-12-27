@@ -1,7 +1,7 @@
 # QEJ-cloudflareR2-yunpan
 
 /**
- * Cloudflare Worker: QEJ云盘 R2 Cloud  (Multi-Upload Fixed)
+ * Cloudflare Worker: QRJ云盘 R2 Cloud  (Multi-Upload Fixed)
  * * 🎨 UI: Sanyue ImgHub 风格 + 玻璃拟态
  * * 🛠️ 新增: 大文件分片上传 (突破 100MB 限制)
  * * 🛠️ 新增: 右上角上传进度悬浮窗 + 🚀 速率/ETA显示
