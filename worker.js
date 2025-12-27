@@ -1,15 +1,11 @@
 /**
- * Cloudflare Worker: R2 Cloud Editor (Multi-Upload Fixed)
+ * Cloudflare Worker: R2 Cloud Editor (Toast UI + Auto Save on Blur)
  * * 🎨 UI: Sanyue ImgHub 风格 + 玻璃拟态
- * * 🛠️ 新增: 大文件分片上传 (突破 100MB 限制)
- * * 🛠️ 新增: 右上角上传进度悬浮窗 + 🚀 速率/ETA显示
- * * 🛡️ 修复: 10MB 以上文件禁止预览，防止浏览器崩溃
- * * ⚡ 优化: 支持多文件并发上传 (修复只能传一个的问题)
- * * 🛠️ 优化: 改名自动同步、侧边栏拖拽、下载无需鉴权
- * * 🛠️ R2 存储桶绑定 变量名称: MY_BUCKET
- * * 🔐 鉴权用户名密码 变量名称: AUTH_USER / AUTH_SECRET
+ * * ✨ 新增: 全局 Toast 提示框 (替代原生 Alert)
+ * * 🖱️ 优化: 侧边栏输入框失去焦点(Blur)自动提交保存
+ * * ⚡ 核心: 支持大文件并发分片上传
+ * * 🛠️ 配置: 变量 MY_BUCKET / AUTH_USER / AUTH_SECRET
  */
-
 
 // --- 1. 前端部分 (HTML + CSS + UI Logic) ---
 const htmlParts = [
@@ -240,7 +236,7 @@ const htmlParts = [
   '  <div id="app-container">',
   '    <div id="sidebar">',
   '      <div class="sidebar-header">',
-  '        <div class="logo-area"><span>☁️ QRJ云盘 Cloud</span></div>',
+  '        <div class="logo-area"><span>☁️ QR精云盘 Cloud</span></div>',
   '        <div class="header-actions">',
   '           <button class="glass-btn" onclick="triggerFileUpload()" title="上传文件">📤 上传文件</button>',
   '           <button class="glass-btn" onclick="handleSidebarNewFile()">📄 新建</button>',
@@ -291,7 +287,7 @@ const htmlParts = [
   '           <span class="login-title">🔐 QRJ Cloud Login</span>',
   '           <div class="login-input-group"><input type="text" id="login-user" class="login-input" placeholder="Username" autocomplete="username"></div>',
   '           <div class="login-input-group"><input type="password" id="login-pass" class="login-input" placeholder="Password" autocomplete="current-password"></div>',
-  '           <button class="primary login-btn" onclick="performLogin()">登录 →</button>',
+  '           <button class="primary login-btn" onclick="performLogin()">登录</button>',
   '       </div>',
   '    </div>',
   '  </div>',
