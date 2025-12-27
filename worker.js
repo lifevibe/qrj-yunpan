@@ -291,7 +291,7 @@ const htmlParts = [
   '           <span class="login-title">🔐 QRJ Cloud Login</span>',
   '           <div class="login-input-group"><input type="text" id="login-user" class="login-input" placeholder="Username" autocomplete="username"></div>',
   '           <div class="login-input-group"><input type="password" id="login-pass" class="login-input" placeholder="Password" autocomplete="current-password"></div>',
-  '           <button class="primary login-btn" onclick="performLogin()">登录 →</button>''
+  '           <button class="primary login-btn" onclick="performLogin()">登录 →</button>',
   '       </div>',
   '    </div>',
   '  </div>',
