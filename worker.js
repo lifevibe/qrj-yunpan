@@ -1,8 +1,9 @@
 /**
- * Cloudflare Worker: R2 Cloud Editor (Stylish Audio Player)
+ * Cloudflare Worker: R2 Cloud Editor (Video Maximize Support)
  * * 🎨 UI: Sanyue ImgHub 风格 + 玻璃拟态
- * * 🎵 优化: 全新设计的自定义音频播放器 (磨砂玻璃 + 频谱动画)
- * * 📂 功能: 图标区分、图片/视频预览、分片上传、自动保存
+ * * 🎬 优化: 视频播放器增加“铺满/还原”按钮，可覆盖编辑区
+ * * 🎵 包含: 自定义音频播放器、图标区分、分片上传
+ * * ⚡ 核心: 完整功能合集
  */
 
 // --- 1. 前端部分 (HTML + CSS + UI Logic) ---
@@ -165,9 +166,32 @@ const htmlParts = [
   '    .rename-input { background: rgba(0,0,0,0.3); border: 1px solid var(--accent-color); color: white; border-radius: 4px; padding: 2px 5px; width: 90%; }',
   '',
   '    /* --- 媒体预览容器通用 --- */',
-  '    .preview-container { display: none; flex: 1; justify-content: center; align-items: center; overflow: hidden; background: rgba(0,0,0,0.1); padding: 20px; flex-direction: column; }',
+  '    .preview-container { display: none; flex: 1; justify-content: center; align-items: center; overflow: hidden; background: rgba(0,0,0,0.1); padding: 20px; flex-direction: column; position: relative; }',
+  '    ',
+  '    /* 图片预览 */',
   '    #image-preview img { max-width: 95%; max-height: 95%; object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 8px; animation: zoomIn 0.3s ease; }',
-  '    #video-preview video { max-width: 95%; max-height: 95%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 8px; outline: none; }',
+  '    ',
+  '    /* 视频预览 */',
+  '    #video-preview video { max-width: 95%; max-height: 95%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 8px; outline: none; transition: all 0.3s; }',
+  '    /* 视频铺满样式 */',
+  '    #video-preview.maximized {',
+  '        position: absolute; top: 0; left: 0; width: 100%; height: 100%;',
+  '        z-index: 500; background: #000; padding: 0; margin: 0;',
+  '    }',
+  '    #video-preview.maximized video {',
+  '        max-width: 100%; max-height: 100%; width: 100%; height: 100%; border-radius: 0; object-fit: contain;',
+  '    }',
+  '    /* 视频铺满按钮 */',
+  '    .video-expand-btn {',
+  '        position: absolute; top: 20px; right: 20px; z-index: 600;',
+  '        background: rgba(0,0,0,0.5); color: #fff;',
+  '        border: 1px solid rgba(255,255,255,0.2);',
+  '        border-radius: 8px; padding: 8px 14px; cursor: pointer;',
+  '        backdrop-filter: blur(8px); transition: all 0.3s;',
+  '        font-size: 13px; display: flex; align-items: center; gap: 5px;',
+  '    }',
+  '    .video-expand-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }',
+  '',
   '    @keyframes zoomIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }',
   '',
   '    /* --- 自定义音频播放器样式 (Sanyue 风格) --- */',
@@ -316,7 +340,10 @@ const htmlParts = [
   '      </div>',
   '      <textarea id="editor" placeholder="// Select a file..."></textarea>',
   '      <div id="image-preview" class="preview-container"><img src="" alt="Preview"></div>',
-  '      <div id="video-preview" class="preview-container"><video controls></video></div>',
+  '      <div id="video-preview" class="preview-container">',
+  '          <button id="video-max-btn" class="video-expand-btn" onclick="toggleVideoMaximize()">⛶ 铺满</button>',
+  '          <video controls></video>',
+  '      </div>',
   '      ',
   '      ',
   '      <div id="audio-preview" class="preview-container">',
@@ -446,6 +473,18 @@ const htmlParts = [
   '            el.classList.remove("show");',
   '            setTimeout(() => el.remove(), 300);',
   '        }, 3000);',
+  '    }',
+  '',
+  '    /* --- Video Maximize Toggle --- */',
+  '    function toggleVideoMaximize() {',
+  '        var el = document.getElementById("video-preview");',
+  '        var btn = document.getElementById("video-max-btn");',
+  '        el.classList.toggle("maximized");',
+  '        if(el.classList.contains("maximized")) {',
+  '            btn.innerHTML = "↙ 还原";',
+  '        } else {',
+  '            btn.innerHTML = "⛶ 铺满";',
+  '        }',
   '    }',
   '',
   '    /* --- Audio Player Logic --- */',
