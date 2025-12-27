@@ -1,0 +1,10 @@
+name = "r2-cloud-editor"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# 重要：绑定 R2 存储桶
+# 这里的 bucket_name 是你在 Cloudflare 后台实际创建的桶名称
+# binding 必须是 "MY_BUCKET"，因为你的代码里用的是 env.MY_BUCKET
+[[r2_buckets]]
+binding = "MY_BUCKET"
+bucket_name = "你的R2存储桶实际名称"
