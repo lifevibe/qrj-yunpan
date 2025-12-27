@@ -232,7 +232,7 @@ const htmlParts = [
   '  <div id="app-container">',
   '    <div id="sidebar">',
   '      <div class="sidebar-header">',
-  '        <div class="logo-area"><span>☁️ QR精云盘 Cloud</span></div>',
+  '        <div class="logo-area"><span>☁️ QRJ云盘 Cloud</span></div>',
   '        <div class="header-actions">',
   '           <button class="glass-btn" onclick="triggerFileUpload()" title="上传文件">📤 上传文件</button>',
   '           <button class="glass-btn" onclick="handleSidebarNewFile()">📄 新建</button>',
@@ -283,7 +283,7 @@ const htmlParts = [
   '           <span class="login-title">🔐 QRJ Cloud Login</span>',
   '           <div class="login-input-group"><input type="text" id="login-user" class="login-input" placeholder="Username" autocomplete="username"></div>',
   '           <div class="login-input-group"><input type="password" id="login-pass" class="login-input" placeholder="Password" autocomplete="current-password"></div>',
-  '           <button class="primary login-btn" onclick="performLogin()">登录 →</button>''
+  '           <button class="primary login-btn" onclick="performLogin()">登录 →</button>',
   '       </div>',
   '    </div>',
   '  </div>',
