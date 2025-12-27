@@ -1,10 +1,9 @@
 /**
- * Cloudflare Worker: R2 Cloud Editor (Toast UI + Auto Save on Blur)
+ * Cloudflare Worker: R2 Cloud Editor (Fix: Create/Rename Blur)
  * * 🎨 UI: Sanyue ImgHub 风格 + 玻璃拟态
- * * ✨ 新增: 全局 Toast 提示框 (替代原生 Alert)
- * * 🖱️ 优化: 侧边栏输入框失去焦点(Blur)自动提交保存
+ * * 🐛 修复: 新建/重命名时点击别处无法保存的问题
+ * * ✨ 优化: 使用 Toast 替代原生 Alert 弹窗
  * * ⚡ 核心: 支持大文件并发分片上传
- * * 🛠️ 配置: 变量 MY_BUCKET / AUTH_USER / AUTH_SECRET
  */
 
 // --- 1. 前端部分 (HTML + CSS + UI Logic) ---
@@ -590,20 +589,25 @@ const htmlParts = [
   '        var currentName = nameSpan.innerText; var originalHtml = container.innerHTML;',
   '        container.innerHTML = "<input type=\'text\' class=\'rename-input\' value=\'" + currentName + "\'>";',
   '        var input = container.querySelector("input"); input.focus(); input.oncontextmenu = function(e) { e.stopPropagation(); };',
-  '        function submit() {',
+  '        var isSubmitting = false;',
+  '        async function submit() {',
+  '            if (isSubmitting) return;',
   '            var newName = input.value.trim();',
   '            if (!newName || newName === currentName) { container.innerHTML = originalHtml; isRenaming = false; row.draggable = true; return; }',
+  '            isSubmitting = true;',
+  '            input.disabled = true; // 立即禁用防止重复',
   '            var newFullKey = isFolder ? oldKey.substring(0, oldKey.length - currentName.length - 1) + newName + "/" : oldKey.substring(0, oldKey.length - currentName.length) + newName;',
   '            statusMsg.innerText = "Renaming...";',
-  '            apiFetch("/api/rename", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ oldKey: oldKey, newKey: newFullKey, isFolder: isFolder }) }).then(res => {',
+  '            try {',
+  '                var res = await apiFetch("/api/rename", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ oldKey: oldKey, newKey: newFullKey, isFolder: isFolder }) });',
   '                isRenaming = false; row.draggable = true;',
-  '                if(res.ok) { statusMsg.innerText = "Renamed"; reloadList(); } else { res.text().then(t => showToast("Error: " + t, "error")); container.innerHTML = originalHtml; }',
-  '            });',
+  '                if(res.ok) { statusMsg.innerText = "Renamed"; reloadList(); } else { res.text().then(t => { showToast("Error: " + t, "error"); container.innerHTML = originalHtml; }); }',
+  '            } catch(e) {',
+  '                showToast("Connection failed", "error"); container.innerHTML = originalHtml; isRenaming = false;',
+  '            }',
   '        }',
   '        input.onclick = function(e) { e.stopPropagation(); }; ',
-  '        /* 按下回车触发 blur 以提交，按下 Esc 取消 */',
   '        input.onkeydown = function(e) { if(e.key === "Enter") input.blur(); if(e.key === "Escape") { container.innerHTML = originalHtml; isRenaming = false; row.draggable = true; } }; ',
-  '        /* 失去焦点自动提交 */',
   '        input.onblur = submit;',
   '    }',
   '',
@@ -627,7 +631,7 @@ const htmlParts = [
   '    function renderRow(label, value) { return "<div class=\'info-row\'><span class=\'info-label\'>" + label + "</span><span class=\'info-value\'>" + value + "</span></div>"; }',
   '    function showFileInfo(key) { event.stopPropagation(); document.getElementById("info-modal").style.display = "flex"; document.getElementById("modal-content").innerHTML = "Loading..."; apiFetch("/api/info?key=" + encodeURIComponent(key)).then(r => r.json()).then(info => { var html = renderRow("Name", info.name) + renderRow("Path", info.key) + renderRow("Size", formatSize(info.size)) + renderRow("Type", info.contentType) + renderRow("Date", new Date(info.uploaded).toLocaleString()); document.getElementById("modal-content").innerHTML = html; }); }',
   '    function showFolderInfo(prefix) { event.stopPropagation(); document.getElementById("info-modal").style.display = "flex"; document.getElementById("modal-content").innerHTML = renderRow("Name", prefix) + renderRow("Type", "Directory"); }',
-  '    /* --- 核心: 新建文件/文件夹输入框自动提交 --- */',
+  '    /* --- 核心: 新建文件/文件夹输入框自动提交 (修复点击别处失效问题) --- */',
   '    function createEntry(type) { ',
   '        var listDiv = document.getElementById("file-list"); ',
   '        var div = document.createElement("div"); ',
@@ -636,14 +640,25 @@ const htmlParts = [
   '        listDiv.insertBefore(div, listDiv.firstChild); ',
   '        var input = div.querySelector("input"); ',
   '        input.focus(); ',
-  '        /* 失去焦点自动提交，为空则取消 */',
-  '        input.onblur = function() { ',
+  '        var isSubmitting = false;',
+  '        input.onblur = async function() { ',
+  '            if (isSubmitting) return;',
   '            var name = input.value.trim(); ',
   '            if(!name) { div.remove(); return; } ',
+  '            isSubmitting = true;',
+  '            input.disabled = true; // 锁定输入框，防止重复提交',
   '            var newKey = currentPrefix + name + (type==="folder"?"/":""); ',
-  '            apiFetch("/api/put/" + encodeURIComponent(newKey), { method: "POST" }).then(() => reloadList()).catch(e => { showToast("创建失败", "error"); div.remove(); }); ',
+  '            try {',
+  '                await apiFetch("/api/put/" + encodeURIComponent(newKey), { method: "POST" });',
+  '                div.remove(); // 移除临时输入框',
+  '                await reloadList(); // 刷新列表',
+  '                showToast("Created successfully", "success");',
+  '            } catch(e) { ',
+  '                showToast("创建失败", "error"); ',
+  '                input.disabled = false; input.focus(); isSubmitting = false;',
+  '            } ',
   '        }; ',
-  '        input.onkeydown = function(e) { if(e.key==="Enter") input.blur(); }; ',
+  '        input.onkeydown = function(e) { if(e.key==="Enter") input.blur(); if(e.key==="Escape") div.remove(); }; ',
   '    }',
   '    async function goUp() { await autoSavePrevious(); var p = currentPrefix.split("/"); p.pop(); p.pop(); loadList(p.length>0 ? p.join("/")+"/" : ""); }',
   '',
