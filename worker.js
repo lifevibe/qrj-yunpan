@@ -280,10 +280,10 @@ const htmlParts = [
   '  <div id="login-modal" class="modal-overlay" style="display: flex;">',
   '    <div class="modal-box login-box">',
   '       <div class="modal-body" style="padding: 30px 25px;">',
-  '           <span class="login-title">🔐 R2 Cloud Login</span>',
+  '           <span class="login-title">🔐 QRJ Cloud Login</span>',
   '           <div class="login-input-group"><input type="text" id="login-user" class="login-input" placeholder="Username" autocomplete="username"></div>',
   '           <div class="login-input-group"><input type="password" id="login-pass" class="login-input" placeholder="Password" autocomplete="current-password"></div>',
-  '           <button class="primary login-btn" onclick="performLogin()">Login →</button>',
+  '           <button class="primary login-btn" onclick="performLogin()">登录 →</button>''
   '       </div>',
   '    </div>',
   '  </div>',
