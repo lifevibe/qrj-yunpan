@@ -1,9 +1,9 @@
 /**
- * Cloudflare Worker: R2 Cloud Editor (Media Player Support)
+ * Cloudflare Worker: R2 Cloud Editor (Specific File Icons)
  * * 🎨 UI: Sanyue ImgHub 风格 + 玻璃拟态
- * * 🎬 新增: 支持 音频 (mp3/wav...) 和 视频 (mp4/webm...) 在线播放
- * * 🖼️ 包含: 图片预览、大文件分片上传、Toast 提示、自动保存
- * * ⚡ 核心: 统一使用 Blob URL 处理多媒体预览
+ * * 📂 优化: 左侧文件列表根据类型显示不同图标 (🖼️/🎬/🎵/📦)
+ * * 🎬 包含: 视频/音频/图片在线预览播放
+ * * ⚡ 核心: 支持大文件并发分片上传 + Toast 提示
  */
 
 // --- 1. 前端部分 (HTML + CSS + UI Logic) ---
@@ -127,7 +127,7 @@ const htmlParts = [
   '',
   '    .file-name-container { display: flex; align-items: center; gap: 8px; flex: 1; overflow: hidden; min-width: 0; }',
   '    .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
-  '    .folder-icon { color: var(--folder-color); font-size: 16px; } .file-icon { opacity: 0.7; font-size: 16px; }',
+  '    .folder-icon { color: var(--folder-color); font-size: 16px; } .file-icon { opacity: 0.8; font-size: 16px; }',
   '    .actions { opacity: 0; transition: opacity 0.2s; display: flex; gap: 0px; } .file-item:hover .actions { opacity: 1; }',
   '    .icon-btn { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: color 0.2s; font-size: 12px; }',
   '    .icon-btn:hover { color: #fff; background: rgba(255,255,255,0.1); } .del-btn:hover { color: var(--danger-color); }',
@@ -551,6 +551,15 @@ const htmlParts = [
   '',
   '    function viewFile(key) { var url = "/api/share/" + encodeURIComponent(key); window.open(url, "_blank"); }',
   '',
+  '    /* --- Helper: Get File Icon --- */',
+  '    function getFileIcon(name) {',
+  '        if (/\\.(jpg|jpeg|png|gif|webp|svg|ico|bmp)$/i.test(name)) return "🖼️";',
+  '        if (/\\.(mp4|webm|ogv|mov|mkv)$/i.test(name)) return "🎬";',
+  '        if (/\\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(name)) return "🎵";',
+  '        if (/\\.(zip|rar|7z|tar|gz)$/i.test(name)) return "📦";',
+  '        return "📄";',
+  '    }',
+  '',
   '    function loadList(prefix) {',
   '      pathDisplay.innerHTML = "Loading...";',
   '      apiFetch("/api/list?prefix=" + encodeURIComponent(prefix)).then(r => r.json()).then(data => {',
@@ -580,7 +589,8 @@ const htmlParts = [
   '            var div = document.createElement("div"); div.className = "file-item"; div.draggable = true;',
   '            div.ondragstart = function(e) { handleDragStart(e, f.key, false); }; div.oncontextmenu = function(e) { showContextMenu(e, f.key, false, this); };',
   '            var keySafe = encodeURIComponent(f.key);',
-  '            var html = "<div class=\'file-name-container\'><span class=\'file-icon\'>📄</span> <span class=\'file-name\' title=\'" + f.key + "\'>" + displayName + "</span></div><div class=\'actions\'><button class=\'icon-btn\' onclick=\'viewFile(\\"" + f.key + "\\")\'>🌐</button><button class=\'icon-btn info-btn\' onclick=\'showFileInfo(\\"" + f.key + "\\")\'>ℹ</button><button class=\'icon-btn rename-btn\' onclick=\'triggerRename(this, \\"" + f.key + "\\", false)\'>✎</button><button class=\'icon-btn move-btn\' onclick=\'triggerMove(\\"" + f.key + "\\", false)\'>➜</button><button class=\'icon-btn copy-btn\' onclick=\'copyLink(\\"" + keySafe + "\\")\'>🔗</button><button class=\'icon-btn\' onclick=\'downloadFile(\\"" + keySafe + "\\")\'>⬇</button><button class=\'icon-btn del-btn\' onclick=\'deleteFile(\\"" + f.key + "\\")\'>×</button></div>";',
+  '            var icon = getFileIcon(displayName);',
+  '            var html = "<div class=\'file-name-container\'><span class=\'file-icon\'>" + icon + "</span> <span class=\'file-name\' title=\'" + f.key + "\'>" + displayName + "</span></div><div class=\'actions\'><button class=\'icon-btn\' onclick=\'viewFile(\\"" + f.key + "\\")\'>🌐</button><button class=\'icon-btn info-btn\' onclick=\'showFileInfo(\\"" + f.key + "\\")\'>ℹ</button><button class=\'icon-btn rename-btn\' onclick=\'triggerRename(this, \\"" + f.key + "\\", false)\'>✎</button><button class=\'icon-btn move-btn\' onclick=\'triggerMove(\\"" + f.key + "\\", false)\'>➜</button><button class=\'icon-btn copy-btn\' onclick=\'copyLink(\\"" + keySafe + "\\")\'>🔗</button><button class=\'icon-btn\' onclick=\'downloadFile(\\"" + keySafe + "\\")\'>⬇</button><button class=\'icon-btn del-btn\' onclick=\'deleteFile(\\"" + f.key + "\\")\'>×</button></div>";',
   '            div.innerHTML = html;',
   '            div.onclick = async function(e) { if(e.target.tagName === "BUTTON" || e.target.tagName === "INPUT" || isRenaming) return; await openFile(f.key, displayName); };',
   '            listDiv.appendChild(div);',
