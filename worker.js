@@ -10,6 +10,7 @@
  * * 🔐 鉴权用户名密码 变量名称: AUTH_USER / AUTH_SECRET
  */
 
+
 // --- 1. 前端部分 (HTML + CSS + UI Logic) ---
 const htmlParts = [
   '<!DOCTYPE html>',
@@ -239,7 +240,7 @@ const htmlParts = [
   '  <div id="app-container">',
   '    <div id="sidebar">',
   '      <div class="sidebar-header">',
-  '        <div class="logo-area"><span>☁️ QR精云盘 Cloud</span></div>',
+  '        <div class="logo-area"><span>☁️ QRJ云盘 Cloud</span></div>',
   '        <div class="header-actions">',
   '           <button class="glass-btn" onclick="triggerFileUpload()" title="上传文件">📤 上传文件</button>',
   '           <button class="glass-btn" onclick="handleSidebarNewFile()">📄 新建</button>',
@@ -250,4 +251,720 @@ const htmlParts = [
   '        <div class="path-bar" id="current-path-display">Connecting...</div>',
   '      </div>',
   '      <div id="file-list"></div>',
-  '
+  '      <div id="sidebar-resizer" class="resizer"></div>',
+  '    </div>',
+  '    <div id="main">',
+  '      <div class="toolbar">',
+  '        <button id="mobile-back-btn" onclick="showMobileSidebar()">⬅</button>',
+  '        <input type="text" id="filename-input" class="toolbar-input" placeholder="输入文件名...">',
+  '        <button class="primary" onclick="prepareNewFile()">新建文件</button>',
+  '        <button class="primary" onclick="saveEditorContent()">保存文件</button>',
+  '        <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">',
+  '             <span id="status">Ready</span>',
+  '             <button onclick="toggleBg()" style="background:transparent; border:none; color:rgba(255,255,255,0.3); cursor:pointer; font-size:18px; padding:0; display:flex; align-items:center;" title="切换背景">🎨</button>',
+  '        </div>',
+  '      </div>',
+  '      <textarea id="editor" placeholder="// Select a file..."></textarea>',
+  '    </div>',
+  '  </div>',
+  '',
+  '  <div id="context-menu" class="context-menu">',
+  '      <div class="menu-item" onclick="execMenu(\'open\')">📄 打开</div>',
+  '      <div class="menu-item" onclick="execMenu(\'share\')">🌐 在线浏览/分享</div>',
+  '      <div class="menu-separator"></div>',
+  '      <div class="menu-item" onclick="execMenu(\'rename\')">✎ 重命名</div>',
+  '      <div class="menu-item" onclick="execMenu(\'cut\')">✂️ 剪切</div>',
+  '      <div class="menu-item" onclick="execMenu(\'copy\')">📑 复制</div>',
+  '      <div class="menu-item" id="menu-paste" onclick="execMenu(\'paste\')">📋 粘贴</div>',
+  '      <div class="menu-separator"></div>',
+  '      <div class="menu-item" onclick="execMenu(\'move\')">➜ 移动...</div>',
+  '      <div class="menu-item" onclick="execMenu(\'copy_link\')">🔗 复制链接</div>',
+  '      <div class="menu-item" onclick="execMenu(\'download\')">⬇ 下载</div>',
+  '      <div class="menu-separator"></div>',
+  '      <div class="menu-item" onclick="execMenu(\'info\')">ℹ 属性</div>',
+  '      <div class="menu-item" onclick="execMenu(\'delete\')" style="color:var(--danger-color)">× 删除</div>',
+  '  </div>',
+  '',
+  '  <div id="login-modal" class="modal-overlay" style="display: flex;">',
+  '    <div class="modal-box login-box">',
+  '       <div class="modal-body" style="padding: 30px 25px;">',
+  '           <span class="login-title">🔐 QRJ Cloud Login</span>',
+  '           <div class="login-input-group"><input type="text" id="login-user" class="login-input" placeholder="Username" autocomplete="username"></div>',
+  '           <div class="login-input-group"><input type="password" id="login-pass" class="login-input" placeholder="Password" autocomplete="current-password"></div>',
+  '           <button class="primary login-btn" onclick="performLogin()">登录 →</button>''
+  '       </div>',
+  '    </div>',
+  '  </div>',
+  '',
+  '  <div id="move-modal" class="modal-overlay">',
+  '    <div class="modal-box">',
+  '       <div class="modal-header"><span id="move-title">移动文件</span><span class="modal-close" onclick="closeModal(\'move-modal\')">✕</span></div>',
+  '       <div class="modal-body">',
+  '           <p style="color:#aaa; margin-bottom:5px; font-size:12px;">选择目标文件夹:</p>',
+  '           <select id="move-folder-select" class="folder-select" onchange="updateMoveInput()"></select>',
+  '           <p style="color:#aaa; margin-bottom:5px; font-size:12px;">目标完整路径 (可编辑):</p>',
+  '           <input type="text" id="move-input" class="full-width-input" spellcheck="false">',
+  '       </div>',
+  '       <div class="modal-footer">',
+  '           <button class="glass-btn" onclick="closeModal(\'move-modal\')">取消</button>',
+  '           <button class="primary" onclick="submitMove()">确认移动</button>',
+  '       </div>',
+  '    </div>',
+  '  </div>',
+  '',
+  '  <div id="info-modal" class="modal-overlay">',
+  '    <div class="modal-box">',
+  '       <div class="modal-header"><span id="modal-title">Info</span><span class="modal-close" onclick="closeModal(\'info-modal\')">✕</span></div>',
+  '       <div class="modal-body" id="modal-content">Loading...</div>',
+  '    </div>',
+  '  </div>',
+  '',
+  '  <div id="confirm-modal" class="modal-overlay">',
+  '    <div class="modal-box">',
+  '       <div class="modal-header"><span id="confirm-title">确认操作</span><span class="modal-close" onclick="closeModal(\'confirm-modal\')">✕</span></div>',
+  '       <div class="modal-body" id="confirm-message"></div>',
+  '       <div class="modal-footer">',
+  '           <button class="glass-btn" onclick="closeModal(\'confirm-modal\')">取消</button>',
+  '           <button id="confirm-btn-ok" class="primary danger-btn">确认删除</button>',
+  '       </div>',
+  '    </div>',
+  '  </div>',
+  '',
+  '  <script>',
+  '    var currentPrefix = "";',
+  '    var authToken = null;',
+  '    var availableFolders = [];',
+  '    var currentEditingKey = null;',
+  '    var isUnsaved = false;',
+  '    var editor = document.getElementById("editor");',
+  '    var filenameInput = document.getElementById("filename-input");',
+  '    var statusMsg = document.getElementById("status");',
+  '    var pathDisplay = document.getElementById("current-path-display");',
+  '    var sidebar = document.getElementById("sidebar");',
+  '    var fileInput = document.getElementById("hidden-file-input");',
+  '    var loginModal = document.getElementById("login-modal");',
+  '    var contextMenu = document.getElementById("context-menu");',
+  '    var isRenaming = false;',
+  '    var isRenamingProcessing = false;',
+  '    var targetMoveKey = null; var targetMoveIsFolder = false; var targetMoveName = "";',
+  '    var clipboardAction = null; var clipboardSource = null; var clipboardIsFolder = false;',
+  '    var ctxTargetKey = null; var ctxIsFolder = false; var ctxTargetEl = null;',
+  '',
+  '    /* --- Toast Notification System --- */',
+  '    function showToast(msg, type = "info") {',
+  '        let container = document.getElementById("toast-container");',
+  '        let el = document.createElement("div");',
+  '        el.className = "toast " + (type === "error" ? "error" : "");',
+  '        el.innerHTML = (type === "error" ? "⚠️ " : "ℹ️ ") + msg;',
+  '        container.appendChild(el);',
+  '        // Force reflow',
+  '        void el.offsetWidth;',
+  '        el.classList.add("show");',
+  '        setTimeout(() => {',
+  '            el.classList.remove("show");',
+  '            setTimeout(() => el.remove(), 300);',
+  '        }, 3000);',
+  '    }',
+  '',
+  '    /* --- 侧边栏拖拽 --- */',
+  '    var resizer = document.getElementById("sidebar-resizer");',
+  '    var isResizingSidebar = false;',
+  '    resizer.addEventListener("mousedown", function(e) {',
+  '        isResizingSidebar = true; resizer.classList.add("resizing");',
+  '        document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none";',
+  '        e.preventDefault();',
+  '    });',
+  '    document.addEventListener("mousemove", function(e) {',
+  '        if (!isResizingSidebar) return;',
+  '        var containerLeft = document.getElementById("app-container").getBoundingClientRect().left;',
+  '        var newWidth = e.clientX - containerLeft;',
+  '        if (newWidth > 240 && newWidth < 600) sidebar.style.width = newWidth + "px";',
+  '    });',
+  '    document.addEventListener("mouseup", function() {',
+  '        if (isResizingSidebar) {',
+  '            isResizingSidebar = false; resizer.classList.remove("resizing");',
+  '            document.body.style.cursor = ""; document.body.style.userSelect = "";',
+  '        }',
+  '    });',
+  '',
+  '    var currentBgState = 0; ',
+  '    const bg1 = "https://bing.img.run/rand_1366x768.php";',
+  '    const bg2 = "https://gips0.baidu.com/it/u=2864904819,3156938601&fm=3074&app=3074&f=PNG?w=2560&h=1440";',
+  '    function toggleBg() {',
+  '        currentBgState = 1 - currentBgState;',
+  '        var url = currentBgState === 0 ? bg1 : bg2;',
+  '        document.body.style.backgroundImage = "url(\'" + url + "\')";',
+  '    }',
+  '',
+  '    function showMobileEditor() { document.body.classList.add("mobile-mode-editor"); }',
+  '    function showMobileSidebar() { document.body.classList.remove("mobile-mode-editor"); }',
+  '',
+  '    editor.addEventListener("input", function() { isUnsaved = true; statusMsg.innerText = "Editing..."; });',
+  '',
+  '    async function handleFilenameBlur() {',
+  '        if (!currentEditingKey || isRenamingProcessing) return;',
+  '        var newName = filenameInput.value.trim();',
+  '        var oldName = currentEditingKey.split("/").pop();',
+  '        if (!newName || newName === oldName) return;',
+  '        isRenamingProcessing = true;',
+  '        var newKey = currentPrefix + newName;',
+  '        statusMsg.innerText = "Renaming...";',
+  '        try {',
+  '            var res = await apiFetch("/api/rename", { ',
+  '                method: "POST", headers: {"Content-Type": "application/json"}, ',
+  '                body: JSON.stringify({ oldKey: currentEditingKey, newKey: newKey, isFolder: false }) ',
+  '            });',
+  '            if (res.ok) {',
+  '                statusMsg.innerText = "Renamed"; currentEditingKey = newKey; reloadList();',
+  '            } else {',
+  '                if(res.status !== 404) { showToast("重命名失败", "error"); filenameInput.value = oldName; }',
+  '            }',
+  '        } catch(e) { console.error(e); filenameInput.value = oldName; }',
+  '        finally { isRenamingProcessing = false; }',
+  '    }',
+  '    filenameInput.addEventListener("blur", handleFilenameBlur);',
+  '    filenameInput.addEventListener("keydown", function(e) { if(e.key === "Enter") { this.blur(); editor.focus(); } });',
+  '',
+  '    (function initAuth() {',
+  '        var savedToken = localStorage.getItem("r2_auth_token");',
+  '        var savedTime = localStorage.getItem("r2_auth_time");',
+  '        var now = new Date().getTime();',
+  '        if (savedToken && savedTime && (now - savedTime < 7 * 24 * 60 * 60 * 1000)) {',
+  '            authToken = savedToken; loginModal.style.display = "none"; loadList("");',
+  '        } else {',
+  '            localStorage.removeItem("r2_auth_token"); localStorage.removeItem("r2_auth_time"); showLoginModal();',
+  '        }',
+  '    })();',
+  '',
+  '    async function apiFetch(url, options = {}) {',
+  '        if (!authToken) { showLoginModal(); throw new Error("Auth required"); }',
+  '        if (!options.headers) options.headers = {};',
+  '        options.headers["Authorization"] = "Basic " + authToken;',
+  '        const response = await fetch(url, options);',
+  '        if (response.status === 401) { authToken = null; showLoginModal(); throw new Error("Auth failed"); }',
+  '        return response;',
+  '    }',
+  '    function showLoginModal() { loginModal.style.display = "flex"; document.getElementById("login-user").focus(); }',
+  '    function performLogin() {',
+  '        var user = document.getElementById("login-user").value;',
+  '        var pass = document.getElementById("login-pass").value;',
+  '        if (!user || !pass) return showToast("请输入用户名和密码", "error");',
+  '        authToken = btoa(user + ":" + pass);',
+  '        localStorage.setItem("r2_auth_token", authToken); localStorage.setItem("r2_auth_time", new Date().getTime());',
+  '        loginModal.style.display = "none"; loadList("");',
+  '    }',
+  '    document.getElementById("login-pass").addEventListener("keypress", function(e) { if (e.key === "Enter") performLogin(); });',
+  '',
+  '    function showContextMenu(e, key, isFolder, element) {',
+  '        e.preventDefault();',
+  '        ctxTargetKey = key; ctxIsFolder = isFolder; ctxTargetEl = element;',
+  '        var pasteBtn = document.getElementById("menu-paste");',
+  '        if(clipboardAction) pasteBtn.classList.remove("disabled");',
+  '        else pasteBtn.classList.add("disabled");',
+  '        contextMenu.style.display = "block";',
+  '        var menuWidth = contextMenu.offsetWidth; var menuHeight = contextMenu.offsetHeight;',
+  '        var winWidth = window.innerWidth; var winHeight = window.innerHeight;',
+  '        var x = e.pageX; var y = e.pageY;',
+  '        if (x + menuWidth > winWidth) { x = winWidth - menuWidth - 10; }',
+  '        if (y + menuHeight > winHeight) { y = y - menuHeight; }',
+  '        if (y < 0) { y = 0; }',
+  '        contextMenu.style.left = x + "px"; contextMenu.style.top = y + "px";',
+  '    }',
+  '    window.addEventListener("click", function() { contextMenu.style.display = "none"; });',
+  '',
+  '    async function execMenu(action) {',
+  '        contextMenu.style.display = "none";',
+  '        if(!ctxTargetKey && action !== "paste") return;',
+  '        if (action === "open") {',
+  '            if (ctxIsFolder) loadList(ctxTargetKey); else openFile(ctxTargetKey, ctxTargetKey.split("/").pop());',
+  '        } else if (action === "share") {',
+  '            if(ctxIsFolder) showToast("无法直接分享文件夹", "error"); else viewFile(ctxTargetKey);',
+  '        } else if (action === "rename") {',
+  '            var btn = ctxTargetEl.querySelector(".rename-btn"); if(btn) triggerRename(btn, ctxTargetKey, ctxIsFolder);',
+  '        } else if (action === "cut") {',
+  '            clipboardAction = "cut"; clipboardSource = ctxTargetKey; clipboardIsFolder = ctxIsFolder; statusMsg.innerText = "Cut: " + ctxTargetKey.split("/").pop();',
+  '        } else if (action === "copy") {',
+  '            clipboardAction = "copy"; clipboardSource = ctxTargetKey; clipboardIsFolder = ctxIsFolder; statusMsg.innerText = "Copied: " + ctxTargetKey.split("/").pop();',
+  '        } else if (action === "paste") { handlePaste();',
+  '        } else if (action === "move") { triggerMove(ctxTargetKey, ctxIsFolder);',
+  '        } else if (action === "copy_link") { copyLink(ctxTargetKey);',
+  '        } else if (action === "download") { if(ctxIsFolder) showToast("暂不支持文件夹下载", "error"); else downloadFile(ctxTargetKey);',
+  '        } else if (action === "info") { if(ctxIsFolder) showFolderInfo(ctxTargetKey); else showFileInfo(ctxTargetKey);',
+  '        } else if (action === "delete") { if(ctxIsFolder) deleteFolder(ctxTargetKey); else deleteFile(ctxTargetKey); }',
+  '    }',
+  '',
+  '    async function handlePaste() {',
+  '        if (!clipboardAction || !clipboardSource) return;',
+  '        var destFolder = currentPrefix;',
+  '        if (ctxIsFolder && ctxTargetKey) destFolder = ctxTargetKey;',
+  '        var fileName = clipboardIsFolder ? clipboardSource.split("/").slice(-2)[0] + "/" : clipboardSource.split("/").pop();',
+  '        var newKey = destFolder + fileName;',
+  '        if (newKey === clipboardSource) {',
+  '            if (clipboardIsFolder) { var folderName = fileName.slice(0, -1); newKey = destFolder + folderName + " - Copy/"; }',
+  '            else { var parts = fileName.split("."); if (parts.length > 1) { var ext = parts.pop(); newKey = destFolder + parts.join(".") + " - Copy." + ext; } else { newKey = destFolder + fileName + " - Copy"; } }',
+  '        }',
+  '        statusMsg.innerText = "Pasting...";',
+  '        try {',
+  '            if (clipboardAction === "cut") {',
+  '                var res = await apiFetch("/api/rename", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ oldKey: clipboardSource, newKey: newKey, isFolder: clipboardIsFolder }) });',
+  '                if(res.ok) { statusMsg.innerText = "Moved"; clipboardAction = null; reloadList(); } else { res.text().then(t => showToast("Error: " + t, "error")); }',
+  '            } else if (clipboardAction === "copy") {',
+  '                var res = await apiFetch("/api/copy", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ srcKey: clipboardSource, destKey: newKey, isFolder: clipboardIsFolder }) });',
+  '                if(res.ok) { statusMsg.innerText = "Copied"; reloadList(); } else { res.text().then(t => showToast("Error: " + t, "error")); }',
+  '            }',
+  '        } catch(e) { console.error(e); showToast("Paste failed", "error"); }',
+  '    }',
+  '',
+  '    async function autoSavePrevious() {',
+  '      if (currentEditingKey && isUnsaved && !editor.disabled) {',
+  '          statusMsg.innerText = "Auto-saving...";',
+  '          try { await apiFetch("/api/put/" + encodeURIComponent(currentEditingKey), { method: "POST", body: editor.value }); statusMsg.innerText = "Saved (Auto)"; isUnsaved = false; }',
+  '          catch(e) { statusMsg.innerText = "Auto-save failed"; console.error(e); }',
+  '      }',
+  '      isUnsaved = false;',
+  '    }',
+  '',
+  '    async function reloadList() { await autoSavePrevious(); loadList(currentPrefix); }',
+  '    function formatSize(bytes) { if (bytes === 0) return "0 B"; var k = 1024; var i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + ["B","KB","MB","GB","TB"][i]; }',
+  '    function formatTime(seconds) { if (!isFinite(seconds) || seconds < 0) return "--"; if (seconds < 60) return Math.ceil(seconds) + "s"; var m = Math.floor(seconds / 60); var s = Math.ceil(seconds % 60); return m + "m " + s + "s"; }',
+  '    function handleDragStart(e, key, isFolder) { e.dataTransfer.setData("text/plain", JSON.stringify({ key: key, isFolder: isFolder })); e.dataTransfer.effectAllowed = "move"; }',
+  '    function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add("drag-target-hover"); }',
+  '    function handleDragLeave(e) { e.currentTarget.classList.remove("drag-target-hover"); }',
+  '    async function handleDrop(e, targetFolderPrefix) {',
+  '        e.preventDefault(); e.currentTarget.classList.remove("drag-target-hover");',
+  '        try {',
+  '          var data = JSON.parse(e.dataTransfer.getData("text/plain")); var srcKey = data.key; var srcIsFolder = data.isFolder;',
+  '          if(!srcKey || (srcIsFolder && targetFolderPrefix.startsWith(srcKey)) || srcKey === targetFolderPrefix) return;',
+  '          var fileName = srcIsFolder ? srcKey.split("/").slice(-2)[0] + "/" : srcKey.split("/").pop(); var newKey = targetFolderPrefix + fileName;',
+  '          if(srcKey === newKey) return;',
+  '          statusMsg.innerText = "Moving...";',
+  '          var res = await apiFetch("/api/rename", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ oldKey: srcKey, newKey: newKey, isFolder: srcIsFolder }) });',
+  '          if(res.ok) { statusMsg.innerText = "Moved!"; reloadList(); } else { res.text().then(t => showToast("Error: " + t, "error")); }',
+  '        } catch(err) { console.error(err); }',
+  '    }',
+  '',
+  '    function viewFile(key) { var url = "/api/share/" + encodeURIComponent(key); window.open(url, "_blank"); }',
+  '',
+  '    function loadList(prefix) {',
+  '      pathDisplay.innerHTML = "Loading...";',
+  '      apiFetch("/api/list?prefix=" + encodeURIComponent(prefix)).then(r => r.json()).then(data => {',
+  '        currentPrefix = prefix; pathDisplay.innerHTML = "root/ " + (prefix ? prefix : ""); pathDisplay.scrollLeft = pathDisplay.scrollWidth;',
+  '        var listDiv = document.getElementById("file-list"); listDiv.innerHTML = ""; availableFolders = data.folders ? data.folders : [];',
+  '        if (currentPrefix !== "") {',
+  '          var p = currentPrefix.split("/"); p.pop(); p.pop(); var parentPrefix = p.length > 0 ? p.join("/") + "/" : "";',
+  '          var div = document.createElement("div"); div.className = "file-item"; div.innerHTML = "<span class=\'file-name\' style=\'color:#aaa\'>🔙 .. (返回上级)</span>";',
+  '          div.onclick = goUp; div.ondragover = handleDragOver; div.ondragleave = handleDragLeave; div.ondrop = function(e) { handleDrop(e, parentPrefix); }; div.oncontextmenu = function(e) { showContextMenu(e, parentPrefix, true, this); }; listDiv.appendChild(div);',
+  '        }',
+  '        if (data.folders) {',
+  '          data.folders.sort();',
+  '          data.folders.forEach(folderPrefix => {',
+  '            var displayName = folderPrefix.slice(currentPrefix.length); var showName = displayName.endsWith("/") ? displayName.slice(0, -1) : displayName;',
+  '            var div = document.createElement("div"); div.className = "file-item"; div.draggable = true;',
+  '            div.ondragstart = function(e) { handleDragStart(e, folderPrefix, true); }; div.ondragover = handleDragOver; div.ondragleave = handleDragLeave; div.ondrop = function(e) { handleDrop(e, folderPrefix); }; div.oncontextmenu = function(e) { showContextMenu(e, folderPrefix, true, this); };',
+  '            var html = "<div class=\'file-name-container\'><span class=\'folder-icon\'>📁</span> <span class=\'file-name\'>" + showName + "</span></div><div class=\'actions\'><button class=\'icon-btn rename-btn\' onclick=\'triggerRename(this, \\"" + folderPrefix + "\\", true)\'>✎</button><button class=\'icon-btn move-btn\' onclick=\'triggerMove(\\"" + folderPrefix + "\\", true)\'>➜</button><button class=\'icon-btn del-btn\' onclick=\'deleteFolder(\\"" + folderPrefix + "\\")\'>×</button></div>";',
+  '            div.innerHTML = html;',
+  '            div.onclick = async function(e) { if(e.target.tagName === "BUTTON" || e.target.tagName === "INPUT" || isRenaming) return; await autoSavePrevious(); loadList(folderPrefix); };',
+  '            listDiv.appendChild(div);',
+  '          });',
+  '        }',
+  '        if (data.files) {',
+  '          data.files.sort(function(a, b) { return new Date(b.uploaded) - new Date(a.uploaded); });',
+  '          data.files.forEach(f => {',
+  '            var displayName = f.key.slice(currentPrefix.length); if(!displayName) return;',
+  '            var div = document.createElement("div"); div.className = "file-item"; div.draggable = true;',
+  '            div.ondragstart = function(e) { handleDragStart(e, f.key, false); }; div.oncontextmenu = function(e) { showContextMenu(e, f.key, false, this); };',
+  '            var keySafe = encodeURIComponent(f.key);',
+  '            var html = "<div class=\'file-name-container\'><span class=\'file-icon\'>📄</span> <span class=\'file-name\' title=\'" + f.key + "\'>" + displayName + "</span></div><div class=\'actions\'><button class=\'icon-btn\' onclick=\'viewFile(\\"" + f.key + "\\")\'>🌐</button><button class=\'icon-btn info-btn\' onclick=\'showFileInfo(\\"" + f.key + "\\")\'>ℹ</button><button class=\'icon-btn rename-btn\' onclick=\'triggerRename(this, \\"" + f.key + "\\", false)\'>✎</button><button class=\'icon-btn move-btn\' onclick=\'triggerMove(\\"" + f.key + "\\", false)\'>➜</button><button class=\'icon-btn copy-btn\' onclick=\'copyLink(\\"" + keySafe + "\\")\'>🔗</button><button class=\'icon-btn\' onclick=\'downloadFile(\\"" + keySafe + "\\")\'>⬇</button><button class=\'icon-btn del-btn\' onclick=\'deleteFile(\\"" + f.key + "\\")\'>×</button></div>";',
+  '            div.innerHTML = html;',
+  '            div.onclick = async function(e) { if(e.target.tagName === "BUTTON" || e.target.tagName === "INPUT" || isRenaming) return; await openFile(f.key, displayName); };',
+  '            listDiv.appendChild(div);',
+  '          });',
+  '        }',
+  '      }).catch(e => { console.log(e); });',
+  '    }',
+  '',
+  '    function closeModal(modalId) { document.getElementById(modalId).style.display = "none"; }',
+  '    document.querySelectorAll(".modal-overlay").forEach(overlay => { if(overlay.id === "login-modal") return; overlay.addEventListener("click", function(e) { if (e.target === overlay) overlay.style.display = "none"; }); });',
+  '',
+  '    /* --- 核心: 重命名输入框自动提交 --- */',
+  '    function triggerRename(btn, oldKey, isFolder) {',
+  '        event.stopPropagation(); isRenaming = true;',
+  '        var row = btn.closest(".file-item"); row.draggable = false;',
+  '        var container = row.querySelector(".file-name-container"); var nameSpan = container.querySelector(".file-name");',
+  '        var currentName = nameSpan.innerText; var originalHtml = container.innerHTML;',
+  '        container.innerHTML = "<input type=\'text\' class=\'rename-input\' value=\'" + currentName + "\'>";',
+  '        var input = container.querySelector("input"); input.focus(); input.oncontextmenu = function(e) { e.stopPropagation(); };',
+  '        function submit() {',
+  '            var newName = input.value.trim();',
+  '            if (!newName || newName === currentName) { container.innerHTML = originalHtml; isRenaming = false; row.draggable = true; return; }',
+  '            var newFullKey = isFolder ? oldKey.substring(0, oldKey.length - currentName.length - 1) + newName + "/" : oldKey.substring(0, oldKey.length - currentName.length) + newName;',
+  '            statusMsg.innerText = "Renaming...";',
+  '            apiFetch("/api/rename", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ oldKey: oldKey, newKey: newFullKey, isFolder: isFolder }) }).then(res => {',
+  '                isRenaming = false; row.draggable = true;',
+  '                if(res.ok) { statusMsg.innerText = "Renamed"; reloadList(); } else { res.text().then(t => showToast("Error: " + t, "error")); container.innerHTML = originalHtml; }',
+  '            });',
+  '        }',
+  '        input.onclick = function(e) { e.stopPropagation(); }; ',
+  '        /* 按下回车触发 blur 以提交，按下 Esc 取消 */',
+  '        input.onkeydown = function(e) { if(e.key === "Enter") input.blur(); if(e.key === "Escape") { container.innerHTML = originalHtml; isRenaming = false; row.draggable = true; } }; ',
+  '        /* 失去焦点自动提交 */',
+  '        input.onblur = submit;',
+  '    }',
+  '',
+  '    function triggerMove(key, isFolder) {',
+  '        event.stopPropagation(); targetMoveKey = key; targetMoveIsFolder = isFolder;',
+  '        var parts = key.split("/"); targetMoveName = isFolder ? parts[parts.length - 2] + "/" : parts[parts.length - 1];',
+  '        var modal = document.getElementById("move-modal"); var select = document.getElementById("move-folder-select"); var input = document.getElementById("move-input");',
+  '        select.innerHTML = ""; var optCurr = document.createElement("option"); optCurr.value = currentPrefix; optCurr.text = "当前目录 (" + (currentPrefix || "Root") + ")"; select.appendChild(optCurr);',
+  '        if (currentPrefix !== "") { var optRoot = document.createElement("option"); optRoot.value = ""; optRoot.text = "Root /"; select.appendChild(optRoot); var partsPrefix = currentPrefix.split("/"); partsPrefix.pop(); partsPrefix.pop(); var parentPrefix = partsPrefix.length > 0 ? partsPrefix.join("/") + "/" : ""; var optParent = document.createElement("option"); optParent.value = parentPrefix; optParent.text = "上级目录 (../)"; select.appendChild(optParent); }',
+  '        availableFolders.forEach(fp => { if (fp === key) return; var opt = document.createElement("option"); opt.value = fp; opt.text = "📂 " + fp.slice(currentPrefix.length); select.appendChild(opt); });',
+  '        input.value = key; modal.style.display = "flex"; input.focus();',
+  '    }',
+  '    function updateMoveInput() { var select = document.getElementById("move-folder-select"); var input = document.getElementById("move-input"); input.value = select.value + targetMoveName; }',
+  '    function submitMove() {',
+  '        var newKey = document.getElementById("move-input").value.trim(); if(!newKey || newKey === targetMoveKey) { closeModal("move-modal"); return; }',
+  '        if(targetMoveIsFolder && !newKey.endsWith("/")) newKey += "/";',
+  '        statusMsg.innerText = "Moving...";',
+  '        apiFetch("/api/rename", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ oldKey: targetMoveKey, newKey: newKey, isFolder: targetMoveIsFolder }) }).then(res => { closeModal("move-modal"); if(res.ok) { statusMsg.innerText = "Moved!"; reloadList(); } else { res.text().then(t => showToast("Error: " + t, "error")); } });',
+  '    }',
+  '    function showConfirmDialog(title, messageHtml, actionCallback) { document.getElementById("confirm-title").innerText = title; document.getElementById("confirm-message").innerHTML = messageHtml; var btn = document.getElementById("confirm-btn-ok"); btn.onclick = function() { actionCallback(); closeModal("confirm-modal"); }; document.getElementById("confirm-modal").style.display = "flex"; }',
+  '    function renderRow(label, value) { return "<div class=\'info-row\'><span class=\'info-label\'>" + label + "</span><span class=\'info-value\'>" + value + "</span></div>"; }',
+  '    function showFileInfo(key) { event.stopPropagation(); document.getElementById("info-modal").style.display = "flex"; document.getElementById("modal-content").innerHTML = "Loading..."; apiFetch("/api/info?key=" + encodeURIComponent(key)).then(r => r.json()).then(info => { var html = renderRow("Name", info.name) + renderRow("Path", info.key) + renderRow("Size", formatSize(info.size)) + renderRow("Type", info.contentType) + renderRow("Date", new Date(info.uploaded).toLocaleString()); document.getElementById("modal-content").innerHTML = html; }); }',
+  '    function showFolderInfo(prefix) { event.stopPropagation(); document.getElementById("info-modal").style.display = "flex"; document.getElementById("modal-content").innerHTML = renderRow("Name", prefix) + renderRow("Type", "Directory"); }',
+  '    /* --- 核心: 新建文件/文件夹输入框自动提交 --- */',
+  '    function createEntry(type) { ',
+  '        var listDiv = document.getElementById("file-list"); ',
+  '        var div = document.createElement("div"); ',
+  '        div.className = "file-item new-entry-row"; ',
+  '        div.innerHTML = "<div class=\'file-name-container\'>" + (type==="folder"?"📁":"📄") + " <input type=\'text\' class=\'rename-input\'></div>"; ',
+  '        listDiv.insertBefore(div, listDiv.firstChild); ',
+  '        var input = div.querySelector("input"); ',
+  '        input.focus(); ',
+  '        /* 失去焦点自动提交，为空则取消 */',
+  '        input.onblur = function() { ',
+  '            var name = input.value.trim(); ',
+  '            if(!name) { div.remove(); return; } ',
+  '            var newKey = currentPrefix + name + (type==="folder"?"/":""); ',
+  '            apiFetch("/api/put/" + encodeURIComponent(newKey), { method: "POST" }).then(() => reloadList()).catch(e => { showToast("创建失败", "error"); div.remove(); }); ',
+  '        }; ',
+  '        input.onkeydown = function(e) { if(e.key==="Enter") input.blur(); }; ',
+  '    }',
+  '    async function goUp() { await autoSavePrevious(); var p = currentPrefix.split("/"); p.pop(); p.pop(); loadList(p.length>0 ? p.join("/")+"/" : ""); }',
+  '',
+  '    /* --- 核心: 打开文件 (新增大小检查防止崩溃) --- */',
+  '    async function openFile(key, shortName) {',
+  '        await autoSavePrevious();',
+  '        currentEditingKey = key;',
+  '        isUnsaved = false;',
+  '        statusMsg.innerText = "Checking size...";',
+  '        filenameInput.value = shortName;',
+  '        showMobileEditor();',
+  '',
+  '        try {',
+  '             // 1. 先获取文件信息',
+  '             var infoRes = await apiFetch("/api/info?key=" + encodeURIComponent(key));',
+  '             if (!infoRes.ok) throw new Error("Info fetch failed");',
+  '             var info = await infoRes.json();',
+  '',
+  '             // 2. 检查大小 (阈值 10MB)',
+  '             if (info.size > 10 * 1024 * 1024) {',
+  '                 editor.value = "⚠️ 文件过大 (" + formatSize(info.size) + ")，无法在线预览/编辑。\\n请点击右侧下载按钮下载到本地查看。\\n\\n(为防止浏览器内存溢出，已自动屏蔽大文件加载)";',
+  '                 editor.disabled = true; // 禁用编辑',
+  '                 statusMsg.innerText = "Too large";',
+  '                 return;',
+  '             }',
+  '',
+  '             // 3. 安全则加载',
+  '             editor.disabled = false;',
+  '             statusMsg.innerText = "Loading...";',
+  '             apiFetch("/api/get/" + encodeURIComponent(key)).then(r => r.text()).then(t => {',
+  '                 editor.value = t;',
+  '                 statusMsg.innerText = "Loaded";',
+  '             });',
+  '        } catch(e) {',
+  '             console.error(e);',
+  '             editor.value = "Error loading file info.";',
+  '             statusMsg.innerText = "Error";',
+  '        }',
+  '    }',
+  '',
+  '    async function prepareNewFile() { await autoSavePrevious(); editor.value = ""; editor.disabled = false; filenameInput.value = ""; filenameInput.focus(); statusMsg.innerText = "New File Mode"; document.querySelectorAll(".file-item.active").forEach(el => el.classList.remove("active")); currentEditingKey = null; isUnsaved = false; showMobileEditor(); }',
+  '    async function handleSidebarNewFile() { await prepareNewFile(); createEntry("file"); }',
+  '    async function saveEditorContent() {',
+  '        if(editor.disabled) { showToast("此文件无法编辑保存", "error"); return; }',
+  '        var newName = filenameInput.value.trim(); if (!newName) return showToast("文件名不能为空", "error");',
+  '        var newKey = currentPrefix + newName;',
+  '        if (currentEditingKey && newKey !== currentEditingKey) {',
+  '            if (isRenamingProcessing) { statusMsg.innerText = "Waiting for rename..."; while(isRenamingProcessing) await new Promise(r => setTimeout(r, 100)); }',
+  '            if (newKey !== currentEditingKey) {',
+  '                statusMsg.innerText = "Renaming & Saving...";',
+  '                try { var res = await apiFetch("/api/rename", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ oldKey: currentEditingKey, newKey: newKey, isFolder: false }) }); if (res.ok) { currentEditingKey = newKey; } else { var t = await res.text(); if (!confirm("Rename failed (" + t + "). Save as new file?")) return; } } catch(e) { showToast("Error during rename: " + e, "error"); return; }',
+  '            }',
+  '        }',
+  '        apiFetch("/api/put/" + encodeURIComponent(newKey), { method: "POST", body: editor.value }).then(() => { statusMsg.innerText = "Saved"; currentEditingKey = newKey; isUnsaved = false; reloadList(); });',
+  '    }',
+  '    function deleteFile(key) { event.stopPropagation(); showConfirmDialog("Del File", "Delete " + key + "?", () => apiFetch("/api/delete/" + encodeURIComponent(key), { method: "DELETE" }).then(() => { reloadList(); showMobileSidebar(); })); }',
+  '    function deleteFolder(key) { event.stopPropagation(); showConfirmDialog("Del Folder", "Delete " + key + "?", () => apiFetch("/api/delete_folder/" + encodeURIComponent(key), { method: "DELETE" }).then(() => reloadList())); }',
+  '    async function downloadFile(key) { event.stopPropagation(); var res = await apiFetch("/api/download/" + key); var blob = await res.blob(); var url = window.URL.createObjectURL(blob); var a = document.createElement("a"); a.href = url; a.download = key.split("/").pop(); a.click(); }',
+  '    function copyLink(key) { event.stopPropagation(); navigator.clipboard.writeText(window.location.origin + "/api/download/" + key); statusMsg.innerText = "Copied"; }',
+  '    function triggerFileUpload() { fileInput.click(); }',
+  '    fileInput.addEventListener("change", function(e) { if(this.files.length) uploadFiles(this.files); this.value=""; });',
+  '    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }',
+  '    ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => sidebar.addEventListener(eventName, preventDefaults, false));',
+  '    sidebar.addEventListener("drop", function(e) { sidebar.classList.remove("drag-active"); if(e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); }, false);',
+  '',
+  '    /* --- 核心: 创建进度条 UI (升级版) --- */',
+  '    function createProgressUI(filename) {',
+  '        var container = document.getElementById("upload-progress-container");',
+  '        var div = document.createElement("div"); div.className = "progress-card";',
+  '        div.innerHTML = "<div class=\'progress-header\'><span class=\'progress-filename\'>" + filename + "</span><span class=\'progress-percent\'>0%</span></div><div class=\'progress-bar-bg\'><div class=\'progress-bar-fill\'></div></div><div class=\'progress-details\'><span>Speed: -</span><span>ETA: -</span></div>";',
+  '        container.appendChild(div);',
+  '        return {',
+  '            update: function(percent, speedStr, etaStr) {',
+  '                div.querySelector(".progress-percent").innerText = percent + "%";',
+  '                div.querySelector(".progress-bar-fill").style.width = percent + "%";',
+  '                var details = div.querySelectorAll(".progress-details span");',
+  '                if(speedStr) details[0].innerText = speedStr;',
+  '                if(etaStr) details[1].innerText = "ETA: " + etaStr;',
+  '            },',
+  '            done: function() {',
+  '                this.update(100, "Done", "0s"); setTimeout(() => { div.style.opacity="0"; setTimeout(() => div.remove(), 300); }, 1500);',
+  '            },',
+  '            error: function() {',
+  '                div.querySelector(".progress-percent").innerText = "Error";',
+  '                div.querySelector(".progress-bar-fill").style.background = "red";',
+  '            }',
+  '        };',
+  '    }',
+  '',
+  '    /* --- 核心: 多文件并发上传逻辑 (修正阻塞问题) --- */',
+  '    async function uploadFiles(files) {',
+  '        /* 将 FileList 转换为数组，以便使用 map 进行并发操作 */',
+  '        var filesArray = Array.from(files);',
+  '        ',
+  '        statusMsg.innerText = "Processing " + filesArray.length + " files...";',
+  '',
+  '        /* 映射每个文件为上传 Promise */',
+  '        var uploadPromises = filesArray.map(async function(file) {',
+  '            var key = currentPrefix + file.name;',
+  '            var ui = createProgressUI(file.name);',
+  '            var startTime = Date.now();',
+  '            ',
+  '            try {',
+  '                /* 小于 50MB 直接上传 */',
+  '                if (file.size < 50 * 1024 * 1024) {',
+  '                     await new Promise((resolve, reject) => {',
+  '                          var xhr = new XMLHttpRequest();',
+  '                          xhr.open("POST", "/api/put/" + encodeURIComponent(key), true);',
+  '                          xhr.setRequestHeader("Authorization", "Basic " + authToken);',
+  '                          xhr.upload.onprogress = function(e) {',
+  '                              if (e.lengthComputable) { ',
+  '                                  var percent = Math.round((e.loaded / e.total) * 100); ',
+  '                                  var elapsed = (Date.now() - startTime) / 1000;',
+  '                                  var speed = elapsed > 0 ? e.loaded / elapsed : 0; // Bytes/s',
+  '                                  var remainingBytes = e.total - e.loaded;',
+  '                                  var eta = speed > 0 ? remainingBytes / speed : 0;',
+  '                                  ui.update(percent, formatSize(speed) + "/s", formatTime(eta));',
+  '                              }',
+  '                          };',
+  '                          xhr.onload = function() { if(xhr.status === 200) { ui.done(); resolve(); } else { ui.error(); reject(xhr.responseText); } };',
+  '                          xhr.onerror = function() { ui.error(); reject("Network error"); };',
+  '                          xhr.send(file);',
+  '                     });',
+  '                } else {',
+  '                     /* 大文件分片上传 */',
+  '                     /* 1. 初始化 */',
+  '                     var initRes = await apiFetch("/api/mp/create?key=" + encodeURIComponent(key), { method: "POST" });',
+  '                     if(!initRes.ok) throw new Error("Init failed");',
+  '                     var { uploadId } = await initRes.json();',
+  '',
+  '                     var chunkSize = 10 * 1024 * 1024; /* 10MB chunk */',
+  '                     var chunks = Math.ceil(file.size / chunkSize);',
+  '                     var parts = [];',
+  '                     var uploadedBytes = 0;',
+  '',
+  '                     for (var partNum = 0; partNum < chunks; partNum++) {',
+  '                          var start = partNum * chunkSize;',
+  '                          var end = Math.min(start + chunkSize, file.size);',
+  '                          var chunk = file.slice(start, end);',
+  '                          ',
+  '                          /* 上传分片 */',
+  '                          var partRes = await apiFetch("/api/mp/upload?key=" + encodeURIComponent(key) + "&id=" + uploadId + "&part=" + (partNum + 1), {',
+  '                              method: "POST", body: chunk',
+  '                          });',
+  '                          if(!partRes.ok) throw new Error("Part failed");',
+  '                          var partData = await partRes.json();',
+  '                          parts.push(partData);',
+  '                          ',
+  '                          uploadedBytes += chunk.size;',
+  '                          var percent = Math.round(((partNum + 1) / chunks) * 100);',
+  '                          ',
+  '                          /* 计算速率 */',
+  '                          var elapsed = (Date.now() - startTime) / 1000;',
+  '                          var speed = elapsed > 0 ? uploadedBytes / elapsed : 0;',
+  '                          var remainingBytes = file.size - uploadedBytes;',
+  '                          var eta = speed > 0 ? remainingBytes / speed : 0;',
+  '                          ',
+  '                          ui.update(percent, formatSize(speed) + "/s", formatTime(eta));',
+  '                     }',
+  '',
+  '                     /* 3. 完成合并 */',
+  '                     await apiFetch("/api/mp/complete?key=" + encodeURIComponent(key) + "&id=" + uploadId, {',
+  '                          method: "POST", body: JSON.stringify({ parts: parts })',
+  '                     });',
+  '                     ui.done();',
+  '                }',
+  '            } catch(e) {',
+  '                console.error(e); ui.error(); ',
+  '                // 不 alert 阻塞其他文件，只在 UI 显示红条',
+  '            }',
+  '        });',
+  '',
+  '        /* 等待所有上传完成（无论成功与否） */',
+  '        await Promise.all(uploadPromises);',
+  '        statusMsg.innerText = "All Done"; ',
+  '        reloadList();',
+  '    }',
+  '  </script>',
+  '</body>',
+  '</html>'
+  ].join('\n');
+   
+  export default {
+    async fetch(request, env) {
+      const url = new URL(request.url);
+      const checkAuth = async (req) => {
+        const h = req.headers.get('Authorization');
+        if (!env.AUTH_USER || !env.AUTH_SECRET) return true;
+        try { const [u, p] = atob(h.split(' ')[1]).split(':'); return u === env.AUTH_USER && p === env.AUTH_SECRET; } catch(e) { return false; }
+      };
+   
+      if (!url.pathname.startsWith('/api/')) return new Response(htmlParts, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+       
+      if (!url.pathname.startsWith('/api/share/') && !url.pathname.startsWith('/api/download/') && !await checkAuth(request)) {
+          return new Response('Unauthorized', { status: 401 });
+      }
+   
+      if (url.pathname === '/api/list') {
+        const prefix = url.searchParams.get('prefix') || '';
+        const list = await env.MY_BUCKET.list({ prefix: prefix, delimiter: '/' });
+        return new Response(JSON.stringify({ files: list.objects, folders: list.delimitedPrefixes }), { headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.pathname.startsWith('/api/get/')) {
+        const obj = await env.MY_BUCKET.get(decodeURIComponent(url.pathname.slice(9)));
+        return obj ? new Response(obj.body) : new Response('404', { status: 404 });
+      }
+      if (url.pathname === '/api/info') {
+        const obj = await env.MY_BUCKET.head(url.searchParams.get('key'));
+        if(!obj) return new Response('404', { status: 404 });
+        return new Response(JSON.stringify({ name: obj.key.split('/').pop(), key: obj.key, size: obj.size, uploaded: obj.uploaded, contentType: obj.httpMetadata?.contentType }), { headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.pathname.startsWith('/api/download/')) {
+        const obj = await env.MY_BUCKET.get(decodeURIComponent(url.pathname.slice(14)));
+        if(!obj) return new Response('404', { status: 404 });
+        const h = new Headers(); obj.writeHttpMetadata(h); h.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(obj.key.split('/').pop())}`);
+        return new Response(obj.body, { headers: h });
+      }
+      if (url.pathname.startsWith('/api/share/')) {
+        const obj = await env.MY_BUCKET.get(decodeURIComponent(url.pathname.slice(11)));
+        if(!obj) return new Response('404', { status: 404 });
+        const h = new Headers(); 
+        obj.writeHttpMetadata(h);
+        h.set('Content-Type', 'text/plain; charset=utf-8'); 
+        h.set('Content-Disposition', 'inline'); 
+        return new Response(obj.body, { headers: h });
+      }
+      if (url.pathname.startsWith('/api/put/')) {
+        if(request.method !== 'POST') return new Response('405', { status: 405 });
+        await env.MY_BUCKET.put(decodeURIComponent(url.pathname.slice(9)), request.body, { httpMetadata: { contentType: request.headers.get('Content-Type') || 'application/octet-stream' } });
+        return new Response('Saved');
+      }
+      /* --- Multipart Upload Backend --- */
+      if (url.pathname === '/api/mp/create') {
+          if(request.method !== 'POST') return new Response('405', { status: 405 });
+          const key = url.searchParams.get('key');
+          const multipart = await env.MY_BUCKET.createMultipartUpload(key);
+          return new Response(JSON.stringify({ uploadId: multipart.uploadId }), { headers: {'Content-Type': 'application/json'} });
+      }
+      if (url.pathname === '/api/mp/upload') {
+          if(request.method !== 'POST') return new Response('405', { status: 405 });
+          const key = url.searchParams.get('key');
+          const uploadId = url.searchParams.get('id');
+          const partNumber = parseInt(url.searchParams.get('part'));
+          const multipart = env.MY_BUCKET.resumeMultipartUpload(key, uploadId);
+          const part = await multipart.uploadPart(partNumber, request.body);
+          return new Response(JSON.stringify(part), { headers: {'Content-Type': 'application/json'} });
+      }
+      if (url.pathname === '/api/mp/complete') {
+          if(request.method !== 'POST') return new Response('405', { status: 405 });
+          const key = url.searchParams.get('key');
+          const uploadId = url.searchParams.get('id');
+          const { parts } = await request.json();
+          const multipart = env.MY_BUCKET.resumeMultipartUpload(key, uploadId);
+          await multipart.complete(parts);
+          return new Response('Completed');
+      }
+      /* -------------------------------- */
+      if (url.pathname.startsWith('/api/delete/')) {
+        if(request.method !== 'DELETE') return new Response('405', { status: 405 });
+        await env.MY_BUCKET.delete(decodeURIComponent(url.pathname.slice(12)));
+        return new Response('Deleted');
+      }
+      if (url.pathname === '/api/rename') {
+         if(request.method !== 'POST') return new Response('405', { status: 405 });
+         const { oldKey, newKey, isFolder } = await request.json();
+         try {
+             if (isFolder) {
+                 let hasMore = true, cursor;
+                 while (hasMore) {
+                     const list = await env.MY_BUCKET.list({ prefix: oldKey, cursor });
+                     for (const obj of list.objects) {
+                         const dest = newKey + obj.key.slice(oldKey.length);
+                         const src = await env.MY_BUCKET.get(obj.key);
+                         await env.MY_BUCKET.put(dest, src.body, { httpMetadata: src.httpMetadata, customMetadata: src.customMetadata });
+                         await env.MY_BUCKET.delete(obj.key);
+                     }
+                     hasMore = list.truncated; cursor = list.cursor;
+                 }
+             } else {
+                 const src = await env.MY_BUCKET.get(oldKey);
+                 if(!src) return new Response('404', { status: 404 });
+                 await env.MY_BUCKET.put(newKey, src.body, { httpMetadata: src.httpMetadata, customMetadata: src.customMetadata });
+                 await env.MY_BUCKET.delete(oldKey);
+             }
+             return new Response('Renamed');
+         } catch (e) { return new Response(e.message, { status: 500 }); }
+      }
+      if (url.pathname === '/api/copy') {
+         if(request.method !== 'POST') return new Response('405', { status: 405 });
+         const { srcKey, destKey, isFolder } = await request.json();
+         try {
+             if (isFolder) {
+                 let hasMore = true, cursor;
+                 while (hasMore) {
+                     const list = await env.MY_BUCKET.list({ prefix: srcKey, cursor });
+                     for (const obj of list.objects) {
+                         const dest = destKey + obj.key.slice(srcKey.length);
+                         const src = await env.MY_BUCKET.get(obj.key);
+                         await env.MY_BUCKET.put(dest, src.body, { httpMetadata: src.httpMetadata, customMetadata: src.customMetadata });
+                     }
+                     hasMore = list.truncated; cursor = list.cursor;
+                 }
+             } else {
+                 const src = await env.MY_BUCKET.get(srcKey);
+                 if(!src) return new Response('404', { status: 404 });
+                 await env.MY_BUCKET.put(destKey, src.body, { httpMetadata: src.httpMetadata, customMetadata: src.customMetadata });
+             }
+             return new Response('Copied');
+         } catch (e) { return new Response(e.message, { status: 500 }); }
+      }
+      if (url.pathname.startsWith('/api/delete_folder/')) {
+        if(request.method !== 'DELETE') return new Response('405', { status: 405 });
+        const prefix = decodeURIComponent(url.pathname.slice(19));
+        const list = await env.MY_BUCKET.list({ prefix });
+        if(list.objects.length) await env.MY_BUCKET.delete(list.objects.map(o => o.key));
+        return new Response('Folder Deleted');
+      }
+      return new Response('404', { status: 404 });
+    }
+  };
