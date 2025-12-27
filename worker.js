@@ -1,9 +1,8 @@
 /**
- * Cloudflare Worker: R2 Cloud Editor (Video Maximize Support)
+ * Cloudflare Worker: R2 Cloud Editor (Integrated Video UI)
  * * 🎨 UI: Sanyue ImgHub 风格 + 玻璃拟态
- * * 🎬 优化: 视频播放器增加“铺满/还原”按钮，可覆盖编辑区
- * * 🎵 包含: 自定义音频播放器、图标区分、分片上传
- * * ⚡ 核心: 完整功能合集
+ * * 🎬 优化: 视频最大化按钮集成到播放器内部 (悬浮显示)
+ * * 🎵 包含: 完整的多媒体播放、文件管理功能
  */
 
 // --- 1. 前端部分 (HTML + CSS + UI Logic) ---
@@ -181,16 +180,26 @@ const htmlParts = [
   '    #video-preview.maximized video {',
   '        max-width: 100%; max-height: 100%; width: 100%; height: 100%; border-radius: 0; object-fit: contain;',
   '    }',
-  '    /* 视频铺满按钮 */',
+  '    ',
+  '    /* 视频铺满按钮 (悬浮集成风格) */',
   '    .video-expand-btn {',
   '        position: absolute; top: 20px; right: 20px; z-index: 600;',
-  '        background: rgba(0,0,0,0.5); color: #fff;',
-  '        border: 1px solid rgba(255,255,255,0.2);',
-  '        border-radius: 8px; padding: 8px 14px; cursor: pointer;',
-  '        backdrop-filter: blur(8px); transition: all 0.3s;',
-  '        font-size: 13px; display: flex; align-items: center; gap: 5px;',
+  '        background: rgba(0, 0, 0, 0.4); /* 半透明黑底 */',
+  '        color: rgba(255, 255, 255, 0.9);',
+  '        border: none; border-radius: 20px;',
+  '        padding: 6px 12px;',
+  '        cursor: pointer;',
+  '        backdrop-filter: blur(5px);',
+  '        font-size: 12px; font-weight: 500;',
+  '        display: flex; align-items: center; gap: 6px;',
+  '        opacity: 0; /* 默认隐藏 */',
+  '        transform: translateY(-10px);',
+  '        transition: all 0.3s ease;',
+  '        box-shadow: 0 2px 10px rgba(0,0,0,0.3);',
   '    }',
-  '    .video-expand-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }',
+  '    /* 鼠标悬停在视频区域时显示按钮 */',
+  '    #video-preview:hover .video-expand-btn { opacity: 1; transform: translateY(0); }',
+  '    .video-expand-btn:hover { background: rgba(0, 0, 0, 0.7); transform: scale(1.05) !important; color: #fff; }',
   '',
   '    @keyframes zoomIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }',
   '',
