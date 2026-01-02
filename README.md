@@ -11,4 +11,5 @@
  * * 🛠️ R2 存储桶绑定 变量名称: MY_BUCKET
  * * 🔐 鉴权用户名密码 变量名称: AUTH_USER / AUTH_SECRET
  */
-预览地址https://qqrj.vpnbpzh.workers.dev/
+ 
+* * 预览地址https://qqrj.vpnbpzh.workers.dev/
