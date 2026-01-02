@@ -1,8 +1,9 @@
 /**
- * Cloudflare Worker: R2 Cloud Editor (Integrated Video UI)
- * * 🎨 UI: Sanyue ImgHub 风格 + 玻璃拟态
- * * 🎬 优化: 视频最大化按钮集成到播放器内部 (悬浮显示)
- * * 🎵 包含: 完整的多媒体播放、文件管理功能
+ * Cloudflare Worker: R2 Cloud Editor (TS Support Edition)
+ * * 🐛 修复: 彻底解决大文件视频无法播放/无法拖动的问题 (Backend Range Support)
+ * * ⚡ 优化: 混合播放策略 (300MB以下内存加载，300MB以上流式加载)
+ * * 🎥 新增: 完美支持 .ts 视频文件流式播放 (集成 mpegts.js)
+ * * 🎨 界面: 保持原有的 Glassmorphism 风格
  */
 
 // --- 1. 前端部分 (HTML + CSS + UI Logic) ---
@@ -15,6 +16,11 @@ const htmlParts = [
   '  <title>R2 Cloud Drive</title>',
   '  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☁️</text></svg>">',
   '  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">',
+  '  ',
+  '  ',
+  '  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>',
+  '  ',
+  '  <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js"></script>',
   '  <style>',
   '    :root {',
   '      --bg-glass: rgba(30, 30, 30, 0.75);',
@@ -134,13 +140,13 @@ const htmlParts = [
   '',
   '    /* --- 上下文菜单 --- */',
   '    .context-menu {',
-  '       display: none; position: absolute; z-index: 2000;',
-  '       background: rgba(40, 40, 40, 0.95);',
-  '       border: 1px solid var(--border-glass);',
-  '       border-radius: 8px; padding: 6px 0;',
-  '       width: 160px; max-height: 80vh; overflow-y: auto;',
-  '       box-shadow: 0 10px 30px rgba(0,0,0,0.5);',
-  '       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);',
+  '        display: none; position: absolute; z-index: 2000;',
+  '        background: rgba(40, 40, 40, 0.95);',
+  '        border: 1px solid var(--border-glass);',
+  '        border-radius: 8px; padding: 6px 0;',
+  '        width: 160px; max-height: 80vh; overflow-y: auto;',
+  '        box-shadow: 0 10px 30px rgba(0,0,0,0.5);',
+  '        backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);',
   '    }',
   '    .context-menu::-webkit-scrollbar { width: 4px; }',
   '    .context-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }',
@@ -165,41 +171,14 @@ const htmlParts = [
   '    .rename-input { background: rgba(0,0,0,0.3); border: 1px solid var(--accent-color); color: white; border-radius: 4px; padding: 2px 5px; width: 90%; }',
   '',
   '    /* --- 媒体预览容器通用 --- */',
-  '    .preview-container { display: none; flex: 1; justify-content: center; align-items: center; overflow: hidden; background: rgba(0,0,0,0.1); padding: 20px; flex-direction: column; position: relative; }',
+  '    .preview-container { display: none; flex: 1; justify-content: center; align-items: center; overflow: hidden; background: rgba(0,0,0,0.1); padding: 20px; flex-direction: column; position: relative; box-sizing: border-box; }',
   '    ',
   '    /* 图片预览 */',
   '    #image-preview img { max-width: 95%; max-height: 95%; object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 8px; animation: zoomIn 0.3s ease; }',
   '    ',
-  '    /* 视频预览 */',
-  '    #video-preview video { max-width: 95%; max-height: 95%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 8px; outline: none; transition: all 0.3s; }',
-  '    /* 视频铺满样式 */',
-  '    #video-preview.maximized {',
-  '        position: absolute; top: 0; left: 0; width: 100%; height: 100%;',
-  '        z-index: 500; background: #000; padding: 0; margin: 0;',
-  '    }',
-  '    #video-preview.maximized video {',
-  '        max-width: 100%; max-height: 100%; width: 100%; height: 100%; border-radius: 0; object-fit: contain;',
-  '    }',
-  '    ',
-  '    /* 视频铺满按钮 (悬浮集成风格) */',
-  '    .video-expand-btn {',
-  '        position: absolute; top: 20px; right: 20px; z-index: 600;',
-  '        background: rgba(0, 0, 0, 0.4); /* 半透明黑底 */',
-  '        color: rgba(255, 255, 255, 0.9);',
-  '        border: none; border-radius: 20px;',
-  '        padding: 6px 12px;',
-  '        cursor: pointer;',
-  '        backdrop-filter: blur(5px);',
-  '        font-size: 12px; font-weight: 500;',
-  '        display: flex; align-items: center; gap: 6px;',
-  '        opacity: 0; /* 默认隐藏 */',
-  '        transform: translateY(-10px);',
-  '        transition: all 0.3s ease;',
-  '        box-shadow: 0 2px 10px rgba(0,0,0,0.3);',
-  '    }',
-  '    /* 鼠标悬停在视频区域时显示按钮 */',
-  '    #video-preview:hover .video-expand-btn { opacity: 1; transform: translateY(0); }',
-  '    .video-expand-btn:hover { background: rgba(0, 0, 0, 0.7); transform: scale(1.05) !important; color: #fff; }',
+  '    /* 视频预览 (Native) */',
+  '    #video-preview { position: relative; width: 100%; height: 100%; background: #000; padding: 0; }',
+  '    #video-preview video { width: 100%; height: 100%; object-fit: contain; outline: none; }',
   '',
   '    @keyframes zoomIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }',
   '',
@@ -240,7 +219,7 @@ const htmlParts = [
   '    .audio-progress-container { width: 100%; margin-bottom: 15px; }',
   '    .time-row { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 5px; font-family: monospace; }',
   '    ',
-  '    /* 自定义 Range Slider */',
+  '    /* 自定义 Range Slider 通用 */',
   '    input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; cursor: pointer; }',
   '    input[type=range]:focus { outline: none; }',
   '    input[type=range]::-webkit-slider-runnable-track {',
@@ -323,11 +302,11 @@ const htmlParts = [
   '  <div id="app-container">',
   '    <div id="sidebar">',
   '      <div class="sidebar-header">',
-  '        <div class="logo-area"><span>☁️ QR精云盘 Cloud</span></div>',
+  '        <div class="logo-area"><span>☁️ QRJ云盘 Cloud</span></div>',
   '        <div class="header-actions">',
   '           <button class="glass-btn" onclick="triggerFileUpload()" title="上传文件">📤 上传文件</button>',
-  '           <button class="glass-btn" onclick="handleSidebarNewFile()">📄 新建</button>',
-  '           <button class="glass-btn" onclick="createEntry(\'folder\')">📁 文件夹</button>',
+  '           <button class="glass-btn" onclick="handleSidebarNewFile()">📄 新建文件</button>',
+  '           <button class="glass-btn" onclick="createEntry(\'folder\')">📁 新建文件夹</button>',
   '           <button class="glass-btn btn-icon" onclick="reloadList()" title="刷新">↻</button>',
   '           <input type="file" id="hidden-file-input" multiple style="display:none">',
   '        </div>',
@@ -342,16 +321,16 @@ const htmlParts = [
   '        <input type="text" id="filename-input" class="toolbar-input" placeholder="输入文件名...">',
   '        <button class="primary" onclick="prepareNewFile()">新建文件</button>',
   '        <button class="primary" onclick="saveEditorContent()">保存文件</button>',
+  '        <button class="primary" onclick="triggerCloudDL()">☁️ 云下载</button>',
   '        <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">',
-  '             <span id="status">Ready</span>',
-  '             <button onclick="toggleBg()" style="background:transparent; border:none; color:rgba(255,255,255,0.3); cursor:pointer; font-size:18px; padding:0; display:flex; align-items:center;" title="切换背景">🎨</button>',
+  '              <span id="status">Ready</span>',
+  '              <button onclick="toggleBg()" style="background:transparent; border:none; color:rgba(255,255,255,0.3); cursor:pointer; font-size:18px; padding:0; display:flex; align-items:center;" title="切换背景">🎨</button>',
   '        </div>',
   '      </div>',
   '      <textarea id="editor" placeholder="// Select a file..."></textarea>',
   '      <div id="image-preview" class="preview-container"><img src="" alt="Preview"></div>',
   '      <div id="video-preview" class="preview-container">',
-  '          <button id="video-max-btn" class="video-expand-btn" onclick="toggleVideoMaximize()">⛶ 铺满</button>',
-  '          <video controls></video>',
+  '          <video id="main-video" controls playsinline preload="metadata"></video>',
   '      </div>',
   '      ',
   '      ',
@@ -423,6 +402,22 @@ const htmlParts = [
   '    </div>',
   '  </div>',
   '',
+  '  ',
+  '  <div id="cloud-dl-modal" class="modal-overlay">',
+  '    <div class="modal-box">',
+  '       <div class="modal-header"><span>☁️ 云下载 (远程上传)</span><span class="modal-close" onclick="closeModal(\'cloud-dl-modal\')">✕</span></div>',
+  '       <div class="modal-body">',
+  '           <p style="color:#aaa; margin-bottom:5px; font-size:12px;">输入文件链接 URL:</p>',
+  '           <input type="text" id="cloud-dl-url" class="full-width-input" placeholder="https://example.com/file.zip" spellcheck="false">',
+  '           <p style="color:#aaa; margin-bottom:5px; font-size:12px; margin-top:10px;">(文件将直接保存到当前目录)</p>',
+  '       </div>',
+  '       <div class="modal-footer">',
+  '           <button class="glass-btn" onclick="closeModal(\'cloud-dl-modal\')">取消</button>',
+  '           <button class="primary" onclick="submitCloudDL()">开始下载</button>',
+  '       </div>',
+  '    </div>',
+  '  </div>',
+  '',
   '  <div id="info-modal" class="modal-overlay">',
   '    <div class="modal-box">',
   '       <div class="modal-header"><span id="modal-title">Info</span><span class="modal-close" onclick="closeModal(\'info-modal\')">✕</span></div>',
@@ -461,6 +456,8 @@ const htmlParts = [
   '    var clipboardAction = null; var clipboardSource = null; var clipboardIsFolder = false;',
   '    var ctxTargetKey = null; var ctxIsFolder = false; var ctxTargetEl = null;',
   '    var currentMediaUrl = null;',
+  '    var hls = null; // HLS 实例',
+  '    var mpegtsPlayer = null; // mpegts 实例',
   '    /* Audio Player Vars */',
   '    var audioEl = document.getElementById("hidden-audio");',
   '    var audioPlayBtn = document.getElementById("audio-play-btn");',
@@ -484,18 +481,6 @@ const htmlParts = [
   '        }, 3000);',
   '    }',
   '',
-  '    /* --- Video Maximize Toggle --- */',
-  '    function toggleVideoMaximize() {',
-  '        var el = document.getElementById("video-preview");',
-  '        var btn = document.getElementById("video-max-btn");',
-  '        el.classList.toggle("maximized");',
-  '        if(el.classList.contains("maximized")) {',
-  '            btn.innerHTML = "↙ 还原";',
-  '        } else {',
-  '            btn.innerHTML = "⛶ 铺满";',
-  '        }',
-  '    }',
-  '',
   '    /* --- Audio Player Logic --- */',
   '    function toggleAudio() {',
   '        if (audioEl.paused) { audioEl.play(); } else { audioEl.pause(); }',
@@ -512,7 +497,8 @@ const htmlParts = [
   '        var pct = (audioEl.currentTime / audioEl.duration) * 100;',
   '        audioSeekSlider.value = pct;',
   '        audioCurrentTime.innerText = formatAudioTime(audioEl.currentTime);',
-  '    });',
+  '    }',
+  '    );',
   '    audioEl.addEventListener("loadedmetadata", () => {',
   '        audioDuration.innerText = formatAudioTime(audioEl.duration);',
   '    });',
@@ -520,6 +506,50 @@ const htmlParts = [
   '        var time = (audioSeekSlider.value / 100) * audioEl.duration;',
   '        audioEl.currentTime = time;',
   '    });',
+  '',
+  '    /* --- Cloud Download Logic --- */',
+  '    function triggerCloudDL() {',
+  '        document.getElementById("cloud-dl-url").value = "";',
+  '        document.getElementById("cloud-dl-modal").style.display = "flex";',
+  '        document.getElementById("cloud-dl-url").focus();',
+  '    }',
+  '    async function submitCloudDL() {',
+  '        var urlInput = document.getElementById("cloud-dl-url");',
+  '        var url = urlInput.value.trim();',
+  '        if (!url) return showToast("请输入有效的 URL", "error");',
+  '        ',
+  '        // 简单的文件名提取逻辑',
+  '        var filename = "download_" + Date.now();',
+  '        try {',
+  '            var urlPath = new URL(url).pathname;',
+  '            var extracted = urlPath.split("/").pop();',
+  '            if (extracted && extracted.indexOf(".") !== -1) filename = extracted;',
+  '        } catch(e) {}',
+  '        ',
+  '        var targetKey = currentPrefix + filename;',
+  '        statusMsg.innerText = "Cloud Downloading...";',
+  '        closeModal("cloud-dl-modal");',
+  '        showToast("后台下载任务已开始...", "info");',
+  '',
+  '        try {',
+  '            var res = await apiFetch("/api/cloud_download", {',
+  '                method: "POST",',
+  '                headers: { "Content-Type": "application/json" },',
+  '                body: JSON.stringify({ fileUrl: url, targetKey: targetKey })',
+  '            });',
+  '            if (res.ok) {',
+  '                showToast("下载成功: " + filename, "success");',
+  '                reloadList();',
+  '                statusMsg.innerText = "Done";',
+  '            } else {',
+  '                var txt = await res.text();',
+  '                showToast("下载失败: " + txt, "error");',
+  '                statusMsg.innerText = "Error";',
+  '            }',
+  '        } catch (e) {',
+  '            showToast("请求失败: " + e.message, "error");',
+  '        }',
+  '    }',
   '',
   '    /* --- 侧边栏拖拽 --- */',
   '    var resizer = document.getElementById("sidebar-resizer");',
@@ -703,7 +733,7 @@ const htmlParts = [
   '    /* --- Helper: Get File Icon --- */',
   '    function getFileIcon(name) {',
   '        if (/\\.(jpg|jpeg|png|gif|webp|svg|ico|bmp)$/i.test(name)) return "🖼️";',
-  '        if (/\\.(mp4|webm|ogv|mov|mkv)$/i.test(name)) return "🎬";',
+  '        if (/\\.(mp4|webm|ogv|mov|mkv|m3u8|ts)$/i.test(name)) return "🎬";',
   '        if (/\\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(name)) return "🎵";',
   '        if (/\\.(zip|rar|7z|tar|gz)$/i.test(name)) return "📦";',
   '        return "📄";',
@@ -833,7 +863,7 @@ const htmlParts = [
   '    }',
   '    async function goUp() { await autoSavePrevious(); var p = currentPrefix.split("/"); p.pop(); p.pop(); loadList(p.length>0 ? p.join("/")+"/" : ""); }',
   '',
-  '    /* --- 核心: 打开文件 (图片/视频/音频/文本) --- */',
+  '    /* --- 核心: 打开文件 (增强混合加载版 + TS Support) --- */',
   '    async function openFile(key, shortName) {',
   '        await autoSavePrevious();',
   '        currentEditingKey = key;',
@@ -842,71 +872,114 @@ const htmlParts = [
   '        filenameInput.value = shortName;',
   '        showMobileEditor();',
   '',
-  '        var isImg = /\\.(jpg|jpeg|png|gif|webp|svg|ico|bmp)$/i.test(key);',
-  '        var isVideo = /\\.(mp4|webm|ogv|mov|mkv)$/i.test(key);',
-  '        var isAudio = /\\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(key);',
+  '        var ext = key.split(".").pop().toLowerCase();',
+  '        var isImg = /^(jpg|jpeg|png|gif|webp|svg|ico|bmp)$/i.test(ext);',
+  '        var isVideo = /^(mp4|webm|ogv|mov|mkv|m3u8|ts)$/i.test(ext);',
+  '        var isAudio = /^(mp3|wav|ogg|m4a|aac|flac)$/i.test(ext);',
+  '        var isHls = ext === "m3u8";',
+  '        var isTs = ext === "ts";',
   '        ',
   '        var editorEl = document.getElementById("editor");',
   '        var imgContainer = document.getElementById("image-preview");',
   '        var videoContainer = document.getElementById("video-preview");',
   '        var audioContainer = document.getElementById("audio-preview");',
-  '        ',
   '        var imgEl = imgContainer.querySelector("img");',
-  '        var videoEl = videoContainer.querySelector("video");',
+  '        var videoEl = document.getElementById("main-video");',
   '        var customAudioPlayer = document.getElementById("custom-audio-player");',
   '        ',
   '        // 重置所有播放器和URL',
   '        if (currentMediaUrl) { URL.revokeObjectURL(currentMediaUrl); currentMediaUrl = null; }',
-  '        videoEl.pause(); videoEl.src = "";',
+  '        videoEl.pause(); videoEl.removeAttribute("src"); videoEl.load();',
+  '        if (hls) { hls.destroy(); hls = null; }',
+  '        if (mpegtsPlayer) { mpegtsPlayer.destroy(); mpegtsPlayer = null; } // 销毁 mpegts 实例',
   '        audioEl.pause(); audioEl.src = "";',
   '        imgEl.src = "";',
   '',
   '        try {',
-  '             var infoRes = await apiFetch("/api/info?key=" + encodeURIComponent(key));',
-  '             if (!infoRes.ok) throw new Error("Info fetch failed");',
-  '             var info = await infoRes.json();',
+  '              var infoRes = await apiFetch("/api/info?key=" + encodeURIComponent(key));',
+  '              if (!infoRes.ok) throw new Error("Info fetch failed");',
+  '              var info = await infoRes.json();',
   '',
-  '             // 检查大小 (阈值 10MB，防止崩溃)',
-  '             if (info.size > 20 * 1024 * 1024) { // 稍微放宽到20MB给视频',
-  '                 hideAll(); editorEl.style.display = "block";',
-  '                 editorEl.value = "⚠️ 文件过大 (" + formatSize(info.size) + ")，在线预览受限。\\n请点击右侧下载按钮下载到本地查看。";',
-  '                 editorEl.disabled = true; ',
-  '                 statusMsg.innerText = "Too large";',
-  '                 return;',
-  '             }',
+  '              statusMsg.innerText = "Loading...";',
+  '              /* 50MB 阈值: 小于则使用 Blob (内存加载/拖动最快)，大于则使用 Range流式播放 */',
+  '              var isSmallFile = info.size < 300 * 1024 * 1024;',
+  '              var streamUrl = "/api/get/" + encodeURIComponent(key) + "?t=" + encodeURIComponent(authToken);',
   '',
-  '             statusMsg.innerText = "Loading...";',
-  '             ',
-  '             if (isImg) {',
-  '                 hideAll(); imgContainer.style.display = "flex"; editorEl.disabled = true;',
-  '                 var blob = await (await apiFetch("/api/get/" + encodeURIComponent(key))).blob();',
-  '                 currentMediaUrl = URL.createObjectURL(blob);',
-  '                 imgEl.src = currentMediaUrl;',
-  '                 statusMsg.innerText = "Image Loaded";',
-  '             } else if (isVideo) {',
-  '                 hideAll(); videoContainer.style.display = "flex"; editorEl.disabled = true;',
-  '                 var blob = await (await apiFetch("/api/get/" + encodeURIComponent(key))).blob();',
-  '                 currentMediaUrl = URL.createObjectURL(blob);',
-  '                 videoEl.src = currentMediaUrl;',
-  '                 statusMsg.innerText = "Video Ready";',
-  '             } else if (isAudio) {',
-  '                 hideAll(); audioContainer.style.display = "flex"; customAudioPlayer.style.display = "flex"; editorEl.disabled = true;',
-  '                 var blob = await (await apiFetch("/api/get/" + encodeURIComponent(key))).blob();',
-  '                 currentMediaUrl = URL.createObjectURL(blob);',
-  '                 audioEl.src = currentMediaUrl;',
-  '                 document.getElementById("player-title").innerText = shortName;',
-  '                 statusMsg.innerText = "Audio Ready";',
-  '             } else {',
-  '                 hideAll(); editorEl.style.display = "block"; editorEl.disabled = false;',
-  '                 var text = await (await apiFetch("/api/get/" + encodeURIComponent(key))).text();',
-  '                 editorEl.value = text;',
-  '                 statusMsg.innerText = "Loaded";',
-  '             }',
+  '              if (isImg) {',
+  '                  hideAll(); imgContainer.style.display = "flex"; editorEl.disabled = true;',
+  '                  var blob = await (await apiFetch("/api/get/" + encodeURIComponent(key))).blob();',
+  '                  currentMediaUrl = URL.createObjectURL(blob);',
+  '                  imgEl.src = currentMediaUrl;',
+  '                  statusMsg.innerText = "Image Loaded";',
+  '              } else if (isVideo) {',
+  '                  hideAll(); videoContainer.style.display = "flex"; editorEl.disabled = true;',
+  '                  ',
+  '                  // --- TS 视频处理逻辑 (mpegts.js) ---',
+  '                  if (isTs && mpegts.getFeatureList().mseLivePlayback) {',
+  '                       mpegtsPlayer = mpegts.createPlayer({',
+  '                           type: "mpegts",  // 明确指定类型',
+  '                           url: streamUrl,',
+  '                           isLive: false',
+  '                       });',
+  '                       mpegtsPlayer.attachMediaElement(videoEl);',
+  '                       mpegtsPlayer.load();',
+  '                       mpegtsPlayer.play();',
+  '                       statusMsg.innerText = "MPEG-TS Stream Ready";',
+  '                  } ',
+  '                  // --- HLS 视频处理逻辑 ---',
+  '                  else if (isHls) {',
+  '                      if (Hls.isSupported()) {',
+  '                          hls = new Hls({',
+  '                              xhrSetup: function(xhr, url) {',
+  '                                  xhr.setRequestHeader("Authorization", "Basic " + authToken);',
+  '                              }',
+  '                          });',
+  '                          hls.loadSource("/api/get/" + encodeURIComponent(key));',
+  '                          hls.attachMedia(videoEl);',
+  '                          hls.on(Hls.Events.MANIFEST_PARSED, function() { videoEl.play(); });',
+  '                          statusMsg.innerText = "HLS Stream Ready";',
+  '                      } else if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {',
+  '                          videoEl.src = streamUrl;',
+  '                          statusMsg.innerText = "Native HLS Ready";',
+  '                      }',
+  '                  } ',
+  '                  // --- 常规视频 (MP4/MKV/WebM) ---',
+  '                  else {',
+  '                      if (isSmallFile) {',
+  '                          // 小文件: 下载 Blob 播放 (Auth 完美支持, 内存加载)',
+  '                          var blob = await (await apiFetch("/api/get/" + encodeURIComponent(key))).blob();',
+  '                          currentMediaUrl = URL.createObjectURL(blob);',
+  '                          videoEl.src = currentMediaUrl;',
+  '                          statusMsg.innerText = "Video Ready (Blob)";',
+  '                      } else {',
+  '                          // 大文件: 流式播放 + URL Token 认证 (依赖后端 Range 支持)',
+  '                          videoEl.src = streamUrl;',
+  '                          statusMsg.innerText = "Stream Ready (Cloud)";',
+  '                      }',
+  '                  }',
+  '              } else if (isAudio) {',
+  '                  hideAll(); audioContainer.style.display = "flex"; customAudioPlayer.style.display = "flex"; editorEl.disabled = true;',
+  '                  document.getElementById("player-title").innerText = shortName;',
+  '                  if (isSmallFile) {',
+  '                      var blob = await (await apiFetch("/api/get/" + encodeURIComponent(key))).blob();',
+  '                      currentMediaUrl = URL.createObjectURL(blob);',
+  '                      audioEl.src = currentMediaUrl;',
+  '                      statusMsg.innerText = "Audio Ready (Blob)";',
+  '                  } else {',
+  '                      audioEl.src = streamUrl;',
+  '                      statusMsg.innerText = "Audio Stream Ready";',
+  '                  }',
+  '              } else {',
+  '                  hideAll(); editorEl.style.display = "block"; editorEl.disabled = false;',
+  '                  var text = await (await apiFetch("/api/get/" + encodeURIComponent(key))).text();',
+  '                  editorEl.value = text;',
+  '                  statusMsg.innerText = "Loaded";',
+  '              }',
   '        } catch(e) {',
-  '             console.error(e);',
-  '             hideAll(); editorEl.style.display = "block";',
-  '             editorEl.value = "Error loading file.";',
-  '             statusMsg.innerText = "Error";',
+  '              console.error(e);',
+  '              hideAll(); editorEl.style.display = "block";',
+  '              editorEl.value = "Error loading file: " + e.message;',
+  '              statusMsg.innerText = "Error";',
   '        }',
   '    }',
   '    function hideAll() {',
@@ -981,66 +1054,66 @@ const htmlParts = [
   '            try {',
   '                /* 小于 50MB 直接上传 */',
   '                if (file.size < 50 * 1024 * 1024) {',
-  '                     await new Promise((resolve, reject) => {',
-  '                          var xhr = new XMLHttpRequest();',
-  '                          xhr.open("POST", "/api/put/" + encodeURIComponent(key), true);',
-  '                          xhr.setRequestHeader("Authorization", "Basic " + authToken);',
-  '                          xhr.upload.onprogress = function(e) {',
-  '                              if (e.lengthComputable) { ',
-  '                                  var percent = Math.round((e.loaded / e.total) * 100); ',
-  '                                  var elapsed = (Date.now() - startTime) / 1000;',
-  '                                  var speed = elapsed > 0 ? e.loaded / elapsed : 0; // Bytes/s',
-  '                                  var remainingBytes = e.total - e.loaded;',
-  '                                  var eta = speed > 0 ? remainingBytes / speed : 0;',
-  '                                  ui.update(percent, formatSize(speed) + "/s", formatTime(eta));',
-  '                              }',
-  '                          };',
-  '                          xhr.onload = function() { if(xhr.status === 200) { ui.done(); resolve(); } else { ui.error(); reject(xhr.responseText); } };',
-  '                          xhr.onerror = function() { ui.error(); reject("Network error"); };',
-  '                          xhr.send(file);',
-  '                     });',
+  '                      await new Promise((resolve, reject) => {',
+  '                           var xhr = new XMLHttpRequest();',
+  '                           xhr.open("POST", "/api/put/" + encodeURIComponent(key), true);',
+  '                           xhr.setRequestHeader("Authorization", "Basic " + authToken);',
+  '                           xhr.upload.onprogress = function(e) {',
+  '                               if (e.lengthComputable) { ',
+  '                                    var percent = Math.round((e.loaded / e.total) * 100); ',
+  '                                    var elapsed = (Date.now() - startTime) / 1000;',
+  '                                    var speed = elapsed > 0 ? e.loaded / elapsed : 0; // Bytes/s',
+  '                                    var remainingBytes = e.total - e.loaded;',
+  '                                    var eta = speed > 0 ? remainingBytes / speed : 0;',
+  '                                    ui.update(percent, formatSize(speed) + "/s", formatTime(eta));',
+  '                               }',
+  '                           };',
+  '                           xhr.onload = function() { if(xhr.status === 200) { ui.done(); resolve(); } else { ui.error(); reject(xhr.responseText); } };',
+  '                           xhr.onerror = function() { ui.error(); reject("Network error"); };',
+  '                           xhr.send(file);',
+  '                      });',
   '                } else {',
-  '                     /* 大文件分片上传 */',
-  '                     /* 1. 初始化 */',
-  '                     var initRes = await apiFetch("/api/mp/create?key=" + encodeURIComponent(key), { method: "POST" });',
-  '                     if(!initRes.ok) throw new Error("Init failed");',
-  '                     var { uploadId } = await initRes.json();',
+  '                      /* 大文件分片上传 */',
+  '                      /* 1. 初始化 */',
+  '                      var initRes = await apiFetch("/api/mp/create?key=" + encodeURIComponent(key), { method: "POST" });',
+  '                      if(!initRes.ok) throw new Error("Init failed");',
+  '                      var { uploadId } = await initRes.json();',
   '',
-  '                     var chunkSize = 10 * 1024 * 1024; /* 10MB chunk */',
-  '                     var chunks = Math.ceil(file.size / chunkSize);',
-  '                     var parts = [];',
-  '                     var uploadedBytes = 0;',
+  '                      var chunkSize = 10 * 1024 * 1024; /* 10MB chunk */',
+  '                      var chunks = Math.ceil(file.size / chunkSize);',
+  '                      var parts = [];',
+  '                      var uploadedBytes = 0;',
   '',
-  '                     for (var partNum = 0; partNum < chunks; partNum++) {',
-  '                          var start = partNum * chunkSize;',
-  '                          var end = Math.min(start + chunkSize, file.size);',
-  '                          var chunk = file.slice(start, end);',
-  '                          ',
-  '                          /* 上传分片 */',
-  '                          var partRes = await apiFetch("/api/mp/upload?key=" + encodeURIComponent(key) + "&id=" + uploadId + "&part=" + (partNum + 1), {',
-  '                              method: "POST", body: chunk',
-  '                          });',
-  '                          if(!partRes.ok) throw new Error("Part failed");',
-  '                          var partData = await partRes.json();',
-  '                          parts.push(partData);',
-  '                          ',
-  '                          uploadedBytes += chunk.size;',
-  '                          var percent = Math.round(((partNum + 1) / chunks) * 100);',
-  '                          ',
-  '                          /* 计算速率 */',
-  '                          var elapsed = (Date.now() - startTime) / 1000;',
-  '                          var speed = elapsed > 0 ? uploadedBytes / elapsed : 0;',
-  '                          var remainingBytes = file.size - uploadedBytes;',
-  '                          var eta = speed > 0 ? remainingBytes / speed : 0;',
-  '                          ',
-  '                          ui.update(percent, formatSize(speed) + "/s", formatTime(eta));',
-  '                     }',
+  '                      for (var partNum = 0; partNum < chunks; partNum++) {',
+  '                           var start = partNum * chunkSize;',
+  '                           var end = Math.min(start + chunkSize, file.size);',
+  '                           var chunk = file.slice(start, end);',
+  '                           ',
+  '                           /* 上传分片 */',
+  '                           var partRes = await apiFetch("/api/mp/upload?key=" + encodeURIComponent(key) + "&id=" + uploadId + "&part=" + (partNum + 1), {',
+  '                               method: "POST", body: chunk',
+  '                           });',
+  '                           if(!partRes.ok) throw new Error("Part failed");',
+  '                           var partData = await partRes.json();',
+  '                           parts.push(partData);',
+  '                           ',
+  '                           uploadedBytes += chunk.size;',
+  '                           var percent = Math.round(((partNum + 1) / chunks) * 100);',
+  '                           ',
+  '                           /* 计算速率 */',
+  '                           var elapsed = (Date.now() - startTime) / 1000;',
+  '                           var speed = elapsed > 0 ? uploadedBytes / elapsed : 0;',
+  '                           var remainingBytes = file.size - uploadedBytes;',
+  '                           var eta = speed > 0 ? remainingBytes / speed : 0;',
+  '                           ',
+  '                           ui.update(percent, formatSize(speed) + "/s", formatTime(eta));',
+  '                      }',
   '',
-  '                     /* 3. 完成合并 */',
-  '                     await apiFetch("/api/mp/complete?key=" + encodeURIComponent(key) + "&id=" + uploadId, {',
-  '                          method: "POST", body: JSON.stringify({ parts: parts })',
-  '                     });',
-  '                     ui.done();',
+  '                      /* 3. 完成合并 */',
+  '                      await apiFetch("/api/mp/complete?key=" + encodeURIComponent(key) + "&id=" + uploadId, {',
+  '                           method: "POST", body: JSON.stringify({ parts: parts })',
+  '                      });',
+  '                      ui.done();',
   '                }',
   '            } catch(e) {',
   '                console.error(e); ui.error(); ',
@@ -1061,14 +1134,28 @@ const htmlParts = [
   export default {
     async fetch(request, env) {
       const url = new URL(request.url);
+      
+      /* --- Auth Check Logic with URL Token Support --- */
       const checkAuth = async (req) => {
-        const h = req.headers.get('Authorization');
         if (!env.AUTH_USER || !env.AUTH_SECRET) return true;
-        try { const [u, p] = atob(h.split(' ')[1]).split(':'); return u === env.AUTH_USER && p === env.AUTH_SECRET; } catch(e) { return false; }
+        
+        // 1. Check Header (Basic Auth)
+        const h = req.headers.get('Authorization');
+        if (h) {
+             try { const [u, p] = atob(h.split(' ')[1]).split(':'); if(u === env.AUTH_USER && p === env.AUTH_SECRET) return true; } catch(e) {}
+        }
+        
+        // 2. Check URL Param "t" (Token Auth for Streaming)
+        const t = new URL(req.url).searchParams.get('t');
+        if (t) {
+             try { const [u, p] = atob(t).split(':'); if(u === env.AUTH_USER && p === env.AUTH_SECRET) return true; } catch(e) {}
+        }
+        
+        return false;
       };
    
       if (!url.pathname.startsWith('/api/')) return new Response(htmlParts, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
-       
+        
       if (!url.pathname.startsWith('/api/share/') && !url.pathname.startsWith('/api/download/') && !await checkAuth(request)) {
           return new Response('Unauthorized', { status: 401 });
       }
@@ -1078,10 +1165,69 @@ const htmlParts = [
         const list = await env.MY_BUCKET.list({ prefix: prefix, delimiter: '/' });
         return new Response(JSON.stringify({ files: list.objects, folders: list.delimitedPrefixes }), { headers: { 'Content-Type': 'application/json' } });
       }
+
+      /* --- 核心修复: 视频流式播放 & Range 请求 --- */
       if (url.pathname.startsWith('/api/get/')) {
-        const obj = await env.MY_BUCKET.get(decodeURIComponent(url.pathname.slice(9)));
-        return obj ? new Response(obj.body) : new Response('404', { status: 404 });
+        const key = decodeURIComponent(url.pathname.slice(9));
+        const rangeHeader = request.headers.get('range');
+
+        // 1. 准备 R2 参数 (支持 Range 和 If-Match)
+        const getOptions = {
+          range: rangeHeader ? rangeHeader : undefined,
+          onlyIf: request.headers.get('if-match') ? { etagMatches: request.headers.get('if-match') } : undefined
+        };
+
+        try {
+          const obj = await env.MY_BUCKET.get(key, getOptions);
+          if (!obj) return new Response('404 Not Found', { status: 404 });
+
+          const headers = new Headers();
+          
+          // 2. 基础 Header (CORS 对视频播放至关重要)
+          obj.writeHttpMetadata(headers);
+          headers.set('Access-Control-Allow-Origin', '*');
+          headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+          headers.set('Accept-Ranges', 'bytes'); // 告诉浏览器支持拖动
+          headers.set('Cache-Control', 'private, max-age=14400'); // 允许浏览器缓存
+          
+          if (obj.httpEtag) headers.set('Etag', obj.httpEtag);
+
+          // 3. MIME 类型智能补全 (防止 R2 元数据缺失)
+          if (!headers.get('content-type') || headers.get('content-type') === 'application/octet-stream') {
+            const ext = key.split('.').pop().toLowerCase();
+            const mimeMap = {
+              'mp4': 'video/mp4', 'mkv': 'video/x-matroska', 'webm': 'video/webm',
+              'mov': 'video/quicktime', 'm3u8': 'application/vnd.apple.mpegurl', 'ts': 'video/mp2t',
+              'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'ogg': 'audio/ogg', 'flac': 'audio/flac'
+            };
+            if (mimeMap[ext]) headers.set('Content-Type', mimeMap[ext]);
+          }
+
+          // 4. 处理 Range 响应 (206 Partial Content)
+          if (rangeHeader && obj.range) {
+            const start = obj.range.offset;
+            const length = obj.range.length;
+            const end = start + length - 1;
+            const total = obj.size;
+
+            headers.set('Content-Range', `bytes ${start}-${end}/${total}`);
+            headers.set('Content-Length', length.toString());
+            
+            return new Response(obj.body, { status: 206, headers });
+          }
+
+          // 5. 完整响应 (200 OK)
+          headers.set('Content-Length', obj.size.toString());
+          return new Response(obj.body, { status: 200, headers });
+
+        } catch (e) {
+          if (e.message.includes('RangeNotSatisfiable')) {
+             return new Response('Requested Range Not Satisfiable', { status: 416 });
+          }
+          return new Response('Internal Error: ' + e.message, { status: 500 });
+        }
       }
+
       if (url.pathname === '/api/info') {
         const obj = await env.MY_BUCKET.head(url.searchParams.get('key'));
         if(!obj) return new Response('404', { status: 404 });
@@ -1106,6 +1252,17 @@ const htmlParts = [
         if(request.method !== 'POST') return new Response('405', { status: 405 });
         await env.MY_BUCKET.put(decodeURIComponent(url.pathname.slice(9)), request.body, { httpMetadata: { contentType: request.headers.get('Content-Type') || 'application/octet-stream' } });
         return new Response('Saved');
+      }
+      /* --- Cloud Download Backend --- */
+      if (url.pathname === '/api/cloud_download') {
+          if(request.method !== 'POST') return new Response('405', { status: 405 });
+          const { fileUrl, targetKey } = await request.json();
+          try {
+              const resp = await fetch(fileUrl);
+              if (!resp.ok) return new Response('Source error: ' + resp.status, {status: 502});
+              await env.MY_BUCKET.put(targetKey, resp.body);
+              return new Response('Done');
+          } catch(e) { return new Response(e.message, { status: 500 }); }
       }
       /* --- Multipart Upload Backend --- */
       if (url.pathname === '/api/mp/create') {
